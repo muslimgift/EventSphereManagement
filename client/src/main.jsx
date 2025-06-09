@@ -6,7 +6,7 @@ import "flatpickr/dist/flatpickr.css";
 import App from "./App.jsx";
 import { AppWrapper } from "./components/common/PageMeta.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
-import UserProvider from "./context/UserContext.jsx";
+import UserProvider from "./context/userContext.jsx";
 
 createRoot(document.getElementById("root")).render(
   

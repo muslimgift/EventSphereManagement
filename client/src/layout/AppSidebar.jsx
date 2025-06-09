@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router";
 import {
   BoxCubeIcon,
   CalenderIcon,
+  ChatIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
@@ -17,14 +18,38 @@ import { useSidebar } from "../context/SidebarContext";
 import SidebarWidget from "./SidebarWidget";
 import { userContext } from "../context/UserContext";
 
+//ADMIN PORTAL
 const ExpoManagement = [
   { icon: <BoxCubeIcon />, name: "Add Expo Center", path: "/add-expo" },
-  { icon: <GridIcon />,name:"Edit Delete Expo Center", path:"/eddel-expo"}
+  { icon: <GridIcon />,name:"Display Expo Center", path:"/eddel-expo"},
+  {icon: <CalenderIcon />,name:"Add Events",path:"/add-event"},
+  {icon:<CalenderIcon/>,name:"Display Events",path:"/display-event"},
+   {icon:<img width="24" height="24" src="https://img.icons8.com/fluency/48/visible.png" alt="event"/>,name:"Remaining Event Locations",path:"/eventwithboothdisplay"},
+  
 ];
-
 const ExhibitorManagement = [
   { icon: <UserCircleIcon />, name: "Exhibitors Approval", path: "/user-approval" },
+  { icon: <UserCircleIcon />, name: "Exhibitors Applications Approval", path: "/user-application" },
 ];
+
+
+//EXHIBITOR PORTAL
+const RegistrationProfileManagement=[
+  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+  
+];
+const BoothSelectionAndManagement=[
+{icon:<CalenderIcon/>,name:"See Future Events", path:"/eventdisplay"},
+{icon:<GridIcon />,name:"See Events With Available Booth" ,path:"/eventwithboothdisplay"},
+{icon:<img width="24" height="24" src="https://img.icons8.com/fluency/48/edit-user-male.png" alt="registration"/>,name:"My Registrations",path:"/registeredevents"},
+
+];
+const ScheduleManagement=[
+  {icon:<GridIcon/>,name:"Add Schedule", path:"/addschedule"},
+  {icon:<img width="24" height="24" src="https://img.icons8.com/arcade/64/display.png" alt="displaySchedule"/>,name:"Display Schedule", path:"/display-schedule"},
+]
+
+
 
 const navItems = [
   {
@@ -32,8 +57,11 @@ const navItems = [
     name: "Dashboard",
     subItems: [{ name: "Ecommerce", path: "/", pro: false }],
   },
+  {
+icon:<ChatIcon/> ,name:"Chat Box",path:"/chatbox"
+  },
   { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
-  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+  
   {
     name: "Forms",
     icon: <ListIcon />,
@@ -105,14 +133,19 @@ const AppSidebar = ({ userRole: propUserRole }) => {
   // Define menu sections dynamically based on role
   const menuSections = useMemo(() => {
     const sections = [];
-
+    sections.push({ section: "Main Menu", items: navItems });
+    sections.push({ section: "Others", items: othersItems });
     if (userRole === "organizer") {
       sections.push({ section: "Expo Management", items: ExpoManagement });
       sections.push({ section: "Exhibitor Management", items: ExhibitorManagement });
+      sections.push({section: "Schedule Management",items:ScheduleManagement})
+    }
+    if(userRole === "exhibitors"){
+      sections.push({ section: "Registration And Profile Management", items: RegistrationProfileManagement });
+      sections.push({ section: "Booth Selection And Management", items: BoothSelectionAndManagement });
     }
 
-    sections.push({ section: "Main Menu", items: navItems });
-    sections.push({ section: "Others", items: othersItems });
+
 
     return sections;
   }, [userRole]);

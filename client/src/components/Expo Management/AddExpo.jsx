@@ -7,6 +7,7 @@ import TextArea from "../form/input/TextArea";
 import FileInput from "../form/input/FileInput";
 import Button from "../ui/button/Button";
 import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 
 const initialState = {
   name: "",
@@ -26,6 +27,7 @@ const initialState = {
 
 export default function AddExpo() {
   const [formData, setFormData] = useState(initialState);
+  const navigate = useNavigate();
   const [imageFiles, setImageFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mapSvgFile, setMapSvgFile] = useState(null);
@@ -113,18 +115,18 @@ const removeLocation = (boothIndex, locationIndex) => {
 
   const addLocation = (boothIndex) => {
     const booths = [...formData.booths];
-    booths[boothIndex].locations.push({ id: "", name: "", address: "", price: "" });
+    booths[boothIndex].locations.push({ id: "", name: "", price: "" });
     setFormData((prev) => ({ ...prev, booths }));
   };
 
 const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // Basic validation for required fields
   if (!mapSvgFile) {
     toast.error("Map SVG file is required");
     return;
   }
+
   if (!Array.isArray(formData.booths)) {
     toast.error("Booths must be an array");
     return;
@@ -133,10 +135,8 @@ const handleSubmit = async (e) => {
   try {
     const data = new FormData();
 
-    // Append simple text fields
     data.append("name", formData.name);
 
-    // Location is an object, send it as JSON string
     const locationObj = {
       city: formData.city,
       address: formData.address,
@@ -145,35 +145,27 @@ const handleSubmit = async (e) => {
     data.append("location", JSON.stringify(locationObj));
 
     data.append("description", formData.description);
-
-    // Facilities and booths are arrays — stringify them
     data.append("facilities", formData.facilities);
     data.append("booths", JSON.stringify(formData.booths));
 
-    // Append image files
     imageFiles.forEach((file) => data.append("images", file));
-
-    // Append mapSvg file
     data.append("mapSvg", mapSvgFile);
 
-    // Make the request
     await axios.post("http://localhost:3000/api/expo/", data, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
     toast.success("Successfully Submitted");
+navigate("/eddel-expo");
+    // Reload page to reset all states and inputs
+    
 
-    // Reset form states
-    setFormData(initialState);
-    setImageFiles([]);
-    setImagePreviews([]);
-    setMapSvgFile(null);
-    setMapSvgPreview("");
   } catch (error) {
     console.error("Error submitting expo center:", error);
     toast.error("Error submitting expo center");
   }
 };
+
 
   return (
     <ComponentCard title="Adding Expo Center">
@@ -234,16 +226,7 @@ const handleSubmit = async (e) => {
         {/* Booths and locations */}
                {formData.booths.map((booth, i) => (
           <div key={i} className="border p-4 mb-4 rounded">
-            <div>
-              <Label>Booth ID</Label>
-              <Input
-                placeholder="Booth ID"
-                value={booth.id}
-                onChange={(e) => handleBoothChange(i, "id", e.target.value)}
-                className="w-full border p-2 mb-2"
-                required={true}
-              />
-            </div>
+
             <div>
               <Label>Booth Name</Label>
               <Input
@@ -259,32 +242,13 @@ const handleSubmit = async (e) => {
 
             {booth.locations.map((loc, j) => (
               <div key={j} className="border p-3 mb-3 rounded space-y-2">
-                <div>
-                  <Label>Location ID</Label>
-                  <Input
-                    placeholder="Location ID"
-                    value={loc.id}
-                    onChange={(e) => handleLocationChange(i, j, "id", e.target.value)}
-                    className="w-full border p-2"
-                    required={true}
-                  />
-                </div>
+
                 <div>
                   <Label>Location Name</Label>
                   <Input
                     placeholder="Location Name"
                     value={loc.name}
                     onChange={(e) => handleLocationChange(i, j, "name", e.target.value)}
-                    className="w-full border p-2"
-                    required={true}
-                  />
-                </div>
-                <div>
-                  <Label>Location Address</Label>
-                  <Input
-                    placeholder="Location Address"
-                    value={loc.address}
-                    onChange={(e) => handleLocationChange(i, j, "address", e.target.value)}
                     className="w-full border p-2"
                     required={true}
                   />

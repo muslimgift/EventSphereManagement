@@ -34,6 +34,7 @@ export default function UserApproval() {
 const handleDelete = async () => {
   try {
     await axios.delete(`http://localhost:3000/api/user/${selectedUserId}`);
+    toast.success("Deleted Successfully");
     setUsers(users.filter((user) => user._id !== selectedUserId));
   } catch (err) {
     console.error("Delete failed:", err);

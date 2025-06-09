@@ -34,28 +34,33 @@ export default function SignInForm() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitted(true);
+  e.preventDefault();
+  setSubmitted(true);
 
+  try {
+    const response = await axios.post("http://localhost:3000/api/user/signin", loginData);
+    const { message, user, status } = response.data;
 
-    let response = await axios.post("http://localhost:3000/api/user/signin",loginData)
-    const {message,user,status}= response.data
-    
-    if(status){
-      if(user.CurrentStatus=="approved" || user.role=="attendees"){
-      toast.success(message)
-      
-      LoginUser(user,isChecked)
-      navigate("/");
+    if (status) {
+      if (user.CurrentStatus === "approved" || user.role === "attendees") {
+        toast.success(message);
+        LoginUser(user, isChecked);
+        navigate("/");
+      } else {
+        toast.error("User is waiting for approval");
       }
-      else{
-        toast.error("User is waiting for approval")
-      }
-    }else{
-      toast.error(message)
+    } else {
+      toast.error(message);
     }
+  } catch (error) {
+    if (!error.response) {
+      toast.error("Network error: Please check your internet connection.");
+    } else {
+      toast.error(error.response.data.message || "Something went wrong!");
+    }
+  }
+};
 
-  };
 
   return (
     <div className="flex flex-col flex-1">

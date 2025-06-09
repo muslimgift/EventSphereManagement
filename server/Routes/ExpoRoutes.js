@@ -12,9 +12,19 @@ router.post(
   ]),
   expoController.createExpoCenter
 );
+// ✅ Update (PUT)
+router.put(
+  "/:id",
+  upload.fields([
+    { name: "images", maxCount: 5 },
+    { name: "mapSvg", maxCount: 1 },
+  ]),
+  expoController.updateExpoCenter
+);
 
 router.get("/", expoController.getExpoCenters);
 router.get("/:id", expoController.getExpoCenterById);
+router.put("/:id",expoController.updateExpoCenter)
 router.delete("/:id", expoController.deleteExpoCenter);
 
 module.exports = router

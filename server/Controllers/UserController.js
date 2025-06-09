@@ -22,17 +22,14 @@ getUsers: async (req, res) => {
 
 deleteUserById: async (req, res) => {
   const { id } = req.params;
-  console.log("Delete request for user id:", id);
 
   try {
     const deletedUser = await UserModel.findByIdAndDelete(id);
 
     if (!deletedUser) {
-      console.log("User not found");
       return res.status(404).json({ status: false, message: "User not found" });
     }
 
-    console.log("User deleted:", deletedUser);
     return res.status(200).json({ status: true, message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -70,7 +67,38 @@ updateUserStatus: async (req, res) => {
     res.status(500).json({ status: false, message: "Server error" });
   }
 },
+//Update User Profile
+updateUserProfile: async (req, res) => {
+  const { _id, facebooklink, websitelink, phonenumber, email, companyname } = req.body;
 
+  if (!(_id && facebooklink && websitelink && phonenumber && email && companyname)) {
+    return res.status(400).json({ status: false, message: "Fields are required" });
+  }
+
+  try {
+    const updateData = { facebooklink, websitelink, phonenumber, email, companyname };
+
+    if (req.file) {
+      const logoUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+      updateData.logolink = logoUrl;
+    }
+
+    const updatedUser = await UserModel.findByIdAndUpdate(_id, updateData, { new: true });
+
+    if (!updatedUser) {
+      return res.status(404).json({ status: false, message: "User not found" });
+    }
+
+    res.status(200).json({
+      status: true,
+      message: "User Profile updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("User Profile update error:", error);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+},
 
 signupUser: async (req, res) => {
         const { username,companyname,phonenumber, email, password, role,CurrentStatus } = req.body;
@@ -133,7 +161,7 @@ loginUser: async (req, res) => {
                 });
             } else {
 
-                console.log(user)
+                
                 const match = await bcrypt.compare(password, user.password);
 
                 if (match){

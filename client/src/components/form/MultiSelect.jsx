@@ -1,51 +1,81 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const MultiSelect = ({
   label,
-  options,
-  defaultSelected = [],
+  options = [],
+  selectedOptions = [],
   onChange,
   disabled = false,
 }) => {
-  const [selectedOptions, setSelectedOptions] = useState(defaultSelected);
   const [isOpen, setIsOpen] = useState(false);
+  const ref = useRef(null);
 
   const toggleDropdown = () => {
     if (!disabled) setIsOpen((prev) => !prev);
   };
 
   const handleSelect = (optionValue) => {
-    const newSelectedOptions = selectedOptions.includes(optionValue)
-      ? selectedOptions.filter((value) => value !== optionValue)
-      : [...selectedOptions, optionValue];
-
-    setSelectedOptions(newSelectedOptions);
-    if (onChange) onChange(newSelectedOptions);
+    let newSelectedOptions;
+    if (selectedOptions.includes(optionValue)) {
+      newSelectedOptions = selectedOptions.filter((v) => v !== optionValue);
+    } else {
+      newSelectedOptions = [...selectedOptions, optionValue];
+    }
+    onChange && onChange(newSelectedOptions);
   };
 
   const removeOption = (value) => {
-    const newSelectedOptions = selectedOptions.filter((opt) => opt !== value);
-    setSelectedOptions(newSelectedOptions);
-    if (onChange) onChange(newSelectedOptions);
+    const newSelectedOptions = selectedOptions.filter((v) => v !== value);
+    onChange && onChange(newSelectedOptions);
   };
 
-  const selectedValuesText = selectedOptions.map(
-    (value) => options.find((option) => option.value === value)?.text || ""
-  );
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (ref.current && !ref.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // Text labels of selected options
+  const selectedTexts = selectedOptions
+    .map((val) => options.find((opt) => opt.value === val))
+    .filter(Boolean)
+    .map((opt) => opt.text);
 
   return (
-    <div className="w-full">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
-        {label}
-      </label>
+    <div className="w-full" ref={ref}>
+      {label && (
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+          {label}
+        </label>
+      )}
 
       <div className="relative z-20 inline-block w-full">
         <div className="relative flex flex-col items-center">
-          <div onClick={toggleDropdown} className="w-full">
+          <div
+            onClick={toggleDropdown}
+            className={`w-full cursor-pointer ${
+              disabled ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                toggleDropdown();
+              }
+            }}
+          >
             <div className="mb-2 flex h-11 rounded-lg border border-gray-300 py-1.5 pl-3 pr-3 shadow-theme-xs outline-hidden transition focus:border-brand-300 focus:shadow-focus-ring dark:border-gray-700 dark:bg-gray-900 dark:focus:border-brand-300">
               <div className="flex flex-wrap flex-auto gap-2">
-                {selectedValuesText.length > 0 ? (
-                  selectedValuesText.map((text, index) => (
+                {selectedTexts.length > 0 ? (
+                  selectedTexts.map((text, index) => (
                     <div
                       key={index}
                       className="group flex items-center justify-center rounded-full border-[0.7px] border-transparent bg-gray-100 py-1 pl-2.5 pr-2 text-sm text-gray-800 hover:border-gray-200 dark:bg-gray-800 dark:text-white/90 dark:hover:border-gray-800"
@@ -58,10 +88,18 @@ const MultiSelect = ({
                             removeOption(selectedOptions[index]);
                           }}
                           className="pl-2 text-gray-500 cursor-pointer group-hover:text-gray-400 dark:text-gray-400"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              removeOption(selectedOptions[index]);
+                            }
+                          }}
                         >
                           <svg
                             className="fill-current"
-                            role="button"
+                            role="img"
                             width="14"
                             height="14"
                             viewBox="0 0 14 14"
@@ -89,11 +127,17 @@ const MultiSelect = ({
               <div className="flex items-center py-1 pl-1 pr-1 w-7">
                 <button
                   type="button"
-                  onClick={toggleDropdown}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleDropdown();
+                  }}
                   className="w-5 h-5 text-gray-700 outline-hidden cursor-pointer focus:outline-hidden dark:text-gray-400"
+                  aria-label={isOpen ? "Close dropdown" : "Open dropdown"}
                 >
                   <svg
-                    className={`stroke-current ${isOpen ? "rotate-180" : ""}`}
+                    className={`stroke-current transition-transform duration-200 ${
+                      isOpen ? "rotate-180" : ""
+                    }`}
                     width="20"
                     height="20"
                     viewBox="0 0 20 20"
@@ -115,30 +159,38 @@ const MultiSelect = ({
 
           {isOpen && (
             <div
-              className="absolute left-0 z-40 w-full overflow-y-auto bg-white rounded-lg shadow-sm top-full max-h-select dark:bg-gray-900"
+              className="absolute left-0 z-40 w-full max-h-60 overflow-y-auto rounded-lg bg-white shadow-sm dark:bg-gray-900"
               onClick={(e) => e.stopPropagation()}
+              role="listbox"
             >
-              <div className="flex flex-col">
-                {options.map((option, index) => (
-                  <div
-                    key={index}
-                    className="hover:bg-primary/5 w-full cursor-pointer rounded-t border-b border-gray-200 dark:border-gray-800"
-                    onClick={() => handleSelect(option.value)}
-                  >
-                    <div
-                      className={`relative flex w-full items-center p-2 pl-2 ${
-                        selectedOptions.includes(option.value)
-                          ? "bg-primary/10"
-                          : ""
-                      }`}
-                    >
-                      <div className="mx-2 leading-6 text-gray-800 dark:text-white/90">
-                        {option.text}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {options.length === 0 && (
+                <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
+                  No options available
+                </div>
+              )}
+              {options.map((option, index) => (
+                <div
+                  key={index}
+                  onClick={() => handleSelect(option.value)}
+                  className={`cursor-pointer px-3 py-2 dark:text-white ${
+  selectedOptions.includes(option.value)
+    ? "bg-green-500 text-white"
+    : ""
+}`}
+
+                  role="option"
+                  aria-selected={selectedOptions.includes(option.value)}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSelect(option.value);
+                    }
+                  }}
+                >
+                  {option.text}
+                </div>
+              ))}
             </div>
           )}
         </div>

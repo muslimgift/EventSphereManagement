@@ -74,19 +74,19 @@ if(isChecked!=true){
           <form onSubmit={handleSubmit}>
             <div className="space-y-5">
               <div>
-                <Label>Username<span className="text-error-500">*</span></Label>
-                <Input type="text" name="username" value={formData.username} onChange={handleChange} placeholder="Enter your username" />
+                <Label>Name<span className="text-error-500">*</span></Label>
+                <Input type="text" required={true} name="username" value={formData.username} onChange={handleChange} placeholder="Enter your Name" />
               </div>
 
               <div>
                 <Label>Email<span className="text-error-500">*</span></Label>
-                <Input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Enter your email" />
+                <Input type="email" required={true} name="email" value={formData.email} onChange={handleChange} placeholder="Enter your email" />
               </div>
 
               <div>
                 <Label>Password<span className="text-error-500">*</span></Label>
                 <div className="relative">
-                  <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Enter your password" />
+                  <Input required={true} type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Enter your password" />
                   <span onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer">
                     {showPassword ? (
                       <EyeIcon className="size-5 fill-gray-500 dark:fill-gray-400" />
@@ -100,6 +100,7 @@ if(isChecked!=true){
               <div>
                 <Label>Role<span className="text-error-500">*</span></Label>
                 <select
+                required
                   name="role"
                   value={formData.role}
                   onChange={handleChange}
@@ -113,12 +114,12 @@ if(isChecked!=true){
 
               <div>
                 <Label>Phone Number<span className="text-error-500">*</span></Label>
-                <Input type="text" name="phonenumber" value={formData.phonenumber} onChange={handleChange} placeholder="Enter your phone number" />
+                <Input required={true} type="text" name="phonenumber" value={formData.phonenumber} onChange={handleChange} placeholder="Enter your phone number" />
               </div>
 
               <div>
                 <Label>Company Name<span className="text-error-500">*</span></Label>
-                <Input type="text" name="companyname" value={formData.companyname} onChange={handleChange} placeholder="Enter your company name" />
+                <Input required={true} type="text" name="companyname" value={formData.companyname} onChange={handleChange} placeholder="Enter your company name" />
               </div>
 
               <div className="flex items-center gap-3">

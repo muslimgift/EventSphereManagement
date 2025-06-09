@@ -18,6 +18,15 @@ const userSchema = new Schema({
         type:String,
         required:true
     },
+    facebooklink:{
+       type:String, 
+    },
+    websitelink:{
+        type:String, 
+    },
+    logolink:{
+ type:String, 
+    },
     password:{
         type:String,
         required:true
