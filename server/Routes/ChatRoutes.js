@@ -7,6 +7,7 @@ router.get("/unread-counts", chatController.getUnreadCountsForUser);
 
 
 router.get("/", chatController.getMessages);
+router.get("/unread-count", chatController.getUnreadChatCountsBySender);
 router.get("/:messageId", chatController.getMessageById);
 router.patch("/edit/:messageId", chatController.editMessage);
 router.patch("/deleteforme/:messageId", chatController.deleteMessageForMe);

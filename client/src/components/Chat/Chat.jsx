@@ -13,7 +13,7 @@ const Chat = () => {
   const [newMessage, setNewMessage] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [editingContent, setEditingContent] = useState("");
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
   const [unreadCounts, setUnreadCounts] = useState({});
 
 

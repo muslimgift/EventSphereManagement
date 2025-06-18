@@ -1,8 +1,7 @@
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useState } from "react";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { backend } from "../../config/hosting";
 import Input from "../form/input/InputField";
 import Button from "../ui/button/Button";
 import Label from "../form/Label";
@@ -11,16 +10,18 @@ export default function ResetPasswordForm() {
   const { token } = useParams();
   const [newPassword, setNewPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+const navigate=useNavigate();
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await axios.post(`${backend}/api/user/resetpassword/${token}`, {
+      const res = await axios.post(`${BASE_URL}/api/user/resetpassword/${token}`, {
         newPassword,
       });
       toast.success(res.data.message);
       setNewPassword("");
+      navigate("/signin");
     } catch (error) {
       toast.error(error.response?.data?.message || "Reset failed");
     } finally {

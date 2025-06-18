@@ -18,11 +18,12 @@ export default function UserApplicationApproval() {
   const [selectedExpoCenter, setSelectedExpoCenter] = useState("all");
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
 
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/register-event")
+      .get(`${BASE_URL}/api/register-event`)
       .then((res) => {
         if (res.data.status) {
           setUsers(res.data.events);
@@ -36,7 +37,7 @@ export default function UserApplicationApproval() {
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://localhost:3000/api/register-event/${selectedUserId}`);
+      await axios.delete(`${BASE_URL}/api/register-event/${selectedUserId}`);
       toast.success("Deleted Successfully");
       setUsers(users.filter((user) => user._id !== selectedUserId));
     } catch (err) {
@@ -54,7 +55,7 @@ export default function UserApplicationApproval() {
 
   const handleStatusChange = async (eventId, newStatus) => {
     try {
-      await axios.patch(`http://localhost:3000/api/register-event/${eventId}`, {
+      await axios.patch(`${BASE_URL}/api/register-event/${eventId}`, {
         status: newStatus,
       });
       setUsers(users.map((user) =>
@@ -176,7 +177,7 @@ export default function UserApplicationApproval() {
                 </TableCell>
                 <TableCell>
                   <a
-                    href={`http://localhost:3000/${order.file}`}
+                    href={`${BASE_URL}/${order.file}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400"

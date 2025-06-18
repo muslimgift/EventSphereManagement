@@ -15,6 +15,7 @@ const [website, setWebsite] = useState(user.websitelink || "");
 const [email, setEmail] = useState(user.email || "");
 const [company, setCompany] = useState(user.companyname || "");
 const [phone, setPhone] = useState(user.phonenumber || "");
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 const { isOpen, openModal, closeModal } = useModal();
 const initializeForm = () => {
   setFacebook(user.facebooklink || "");
@@ -36,7 +37,7 @@ const handleSave = async (e) => {
   }
 
   try {
-    const res = await axios.post("http://localhost:3000/api/user/updateprofile", {
+    const res = await axios.post(`${BASE_URL}/api/user/updateprofile`, {
       _id: user._id,
       facebooklink: facebook,
       websitelink: website,

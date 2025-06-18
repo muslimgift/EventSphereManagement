@@ -16,7 +16,7 @@ export default function EditDeleteExpo() {
   const [selectedExpoId, setSelectedExpoId] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
   const navigate = useNavigate();
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     fetchExpos();

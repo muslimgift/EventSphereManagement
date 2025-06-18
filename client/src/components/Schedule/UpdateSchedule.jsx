@@ -7,7 +7,6 @@ import Select from "../form/Select";
 import MultiSelect from "../form/MultiSelect";
 import { toast } from "react-toastify";
 import { useParams, useNavigate } from "react-router-dom";
-import { debounce } from "lodash";
 
 const initialState = {
   title: "",
@@ -28,11 +27,11 @@ export default function UpdateSchedule() {
   const [formData, setFormData] = useState(initialState);
   const [events, setEvents] = useState([]);
   const [availableBooths, setAvailableBooths] = useState([]);
-
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
   // Fetch all events once
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/event")
+      .get(`${BASE_URL}/api/event`)
       .then((res) => {
         setEvents(res.data.data || []);
       })
@@ -42,7 +41,7 @@ export default function UpdateSchedule() {
   // Fetch schedule details to pre-fill form
   useEffect(() => {
     axios
-      .get(`http://localhost:3000/api/schedule/${id}`)
+      .get(`${BASE_URL}/api/schedule/${id}`)
       .then((res) => {
         const sched = res.data;
         setFormData({
@@ -60,39 +59,51 @@ export default function UpdateSchedule() {
       .catch(() => toast.error("Failed to load schedule details"));
   }, [id]);
 
-  // Debounced booth fetch function
-  const fetchAvailableBooths = useCallback(
-    debounce(({ event, scheduledate, StartTime, EndTime }) => {
-      if (event && scheduledate && StartTime && EndTime) {
-        axios
-          .get(`http://localhost:3000/api/schedule/available/booths`, {
-            params: { eventId: event, scheduledate, StartTime, EndTime },
-          })
-          .then((res) => {
-            setAvailableBooths(res.data.booths || res.data || []);
-          })
-          .catch(() => toast.error("Failed to fetch booths"));
-      } else {
-        setAvailableBooths([]);
-        setFormData((prev) => ({ ...prev, booth: [] }));
-      }
-    }, 500),
-    [] // empty dependency so function instance is stable
-  );
+ // Updated booth fetch function without debounce and with excludeScheduleId support
+const fetchAvailableBooths = useCallback(
+  ({ event, scheduledate, StartTime, EndTime, excludeScheduleId }) => {
+    if (event && scheduledate && StartTime && EndTime) {
+      axios
+        .get(`${BASE_URL}/api/schedule/available/booths`, {
+          params: {
+            eventId: event,
+            scheduledate,
+            StartTime,
+            EndTime,
+            excludeScheduleId, // Add only if defined
+          },
+        })
+        .then((res) => {
+          setAvailableBooths(res.data.booths || res.data || []);
+        })
+        .catch(() => toast.error("Failed to fetch booths"));
+    } else {
+      setAvailableBooths([]);
+      setFormData((prev) => ({ ...prev, booth: [] }));
+    }
+  },
+  [] // No debounce, function is still memoized
+);
 
-  // Call debounced booth fetch when formData dependencies change
-  useEffect(() => {
-    fetchAvailableBooths({
-      event: formData.event,
-      scheduledate: formData.scheduledate,
-      StartTime: formData.StartTime,
-      EndTime: formData.EndTime,
-    });
 
-    return () => {
-      fetchAvailableBooths.cancel();
-    };
-  }, [formData.event, formData.scheduledate, formData.StartTime, formData.EndTime, fetchAvailableBooths]);
+useEffect(() => {
+  fetchAvailableBooths({
+    event: formData.event,
+    scheduledate: formData.scheduledate,
+    StartTime: formData.StartTime,
+    EndTime: formData.EndTime,
+    excludeScheduleId: id // <-- use URL param directly
+  });
+}, [
+  formData.event,
+  formData.scheduledate,
+  formData.StartTime,
+  formData.EndTime,
+  id, // dependency
+  fetchAvailableBooths
+]);
+
+
 
   // Handle input change (for text/select inputs)
   const handleChange = (e) => {
@@ -118,21 +129,33 @@ export default function UpdateSchedule() {
     }));
   };
 
-  // Submit updated schedule
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.put(`http://localhost:3000/api/schedule/${id}`, formData);
-      if (res.data.success) {
-        toast.success("Schedule updated successfully!");
-        navigate("/display-schedule");
-      } else {
-        toast.error(res.data.message || "Failed to update schedule");
-      }
-    } catch (error) {
-      toast.error("Update failed: " + (error.response?.data?.message || error.message));
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  // Validate booth selection
+  if (!formData.booth || formData.booth.length === 0) {
+    toast.error("Please select at least one booth");
+    return;
+  }
+
+  try {
+    const res = await axios.put(`${BASE_URL}/api/schedule/${id}`, formData);
+
+    if (res.data.success) {
+      toast.success("Schedule updated successfully!");
+      navigate("/display-schedule");
+    } else {
+      toast.error(res.data.message || "Failed to update schedule");
     }
-  };
+  } catch (error) {
+    // More informative error toast from backend if available
+    if (error.response?.data?.message) {
+      toast.error("Update failed: " + "error.response.data.message");
+    } else {
+      toast.error("Update failed: " + error.message);
+    }
+  }
+};
 
   return (
     <ComponentCard title="Update Schedule">
@@ -188,13 +211,16 @@ export default function UpdateSchedule() {
           placeholder="Select Event"
           required
         />
-        <MultiSelect
-          label="Select Booth(s)"
-          options={availableBooths.map((b) => ({ text: b.name || b, value: b.id || b._id || b }))}
-          selectedOptions={formData.booth}
-          onChange={handleBoothChange}
-          disabled={availableBooths.length === 0}
-        />
+        
+ <MultiSelect
+  label="Select Booth(s)"
+  options={availableBooths.map((b) => ({ text: b.name, value: b._id }))}
+  selectedOptions={formData.booth}
+  onChange={handleBoothChange}
+  disabled={availableBooths.length === 0}
+/>
+
+
         <MultiSelect
           label="Select Attendees"
           options={[]} // You can fetch and populate attendees list if needed

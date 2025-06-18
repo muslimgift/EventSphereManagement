@@ -10,10 +10,13 @@ const eventRouter=require('./Routes/EventRoutes')
 const registerRouter=require('./Routes/RegisterEvents')
 const chatRouter=require('./Routes/ChatRoutes')
 const scheduleRouter=require('./Routes/ScheduleRoutes')
-
+const boothRoutes = require("./Routes/BoothRoutes");
+const locationRoutes = require("./Routes/LocationRoutes");
+const statRoutes=require("./Routes/StatisticsRoutes")
+const BASE_URL = process.env.FRONTEND_URL;
 app.use(express.json())
 app.use(cors({
-  origin: 'http://localhost:5000', // frontend URL
+  origin: BASE_URL, // frontend URL
   credentials: true
 }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -24,8 +27,9 @@ app.use("/api/event",eventRouter)
 app.use("/api/register-event",registerRouter)
 app.use("/api/chat",chatRouter)
 app.use("/api/schedule",scheduleRouter)
-
-
+app.use("/api/booth", boothRoutes);
+app.use("/api/location", locationRoutes);
+app.use("/api/statistics",statRoutes)
 ConnectDB()
 
 app.get("/", (req, res) => {

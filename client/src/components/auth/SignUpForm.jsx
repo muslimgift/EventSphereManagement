@@ -12,6 +12,7 @@ export default function SignUpForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   const [formData, setFormData] = useState({
     username: '',
@@ -43,7 +44,7 @@ if(isChecked!=true){
     if (username && email && password && role && phonenumber && companyname ) {
       setSubmitted(true);
       try {
-        const response = await axios.post("http://localhost:3000/api/user/signup", formData);
+        const response = await axios.post(`${BASE_URL}/api/user/signup`, formData);
         const {  status, message } = response.data;
         if (status) {
           toast.success(message);

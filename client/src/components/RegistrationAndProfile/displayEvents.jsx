@@ -6,16 +6,20 @@ import {
   TableHeader,
   TableRow,
 } from "../ui/table";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
+import Label from "../form/Label";
 import Input from "../form/input/InputField";
+import Button from "../ui/button/Button";
 
-export default function DisplayEvents() {
+export default function DisplayEvent() {
   const [events, setEvents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filterFromDate, setFilterFromDate] = useState("");
+  const [filterToDate, setFilterToDate] = useState("");
+  const [locationCounts, setLocationCounts] = useState({});
   const navigate = useNavigate();
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;;
   const [previewImage, setPreviewImage] = useState(null);
 
   useEffect(() => {
@@ -24,69 +28,87 @@ export default function DisplayEvents() {
 
   const fetchEvents = async () => {
     try {
-      const res = await axios.get(`${baseUrl}/api/event?populate=expoCenter`);
+      const res = await axios.get(`${baseUrl}/api/event`);
       const eventsData = res.data.data;
+      setEvents(eventsData);
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const counts = {};
 
-      const upcomingEvents = eventsData.filter(event => new Date(event.dateFrom) >= today);
+      for (const event of eventsData) {
+        let totalAvailable = 0;
 
-      const eventsWithAvailability = await Promise.all(
-        upcomingEvents.map(async (event) => {
-          const bookedRes = await axios.get(`${baseUrl}/api/register-event/booked-locations/${event._id}`);
-          const bookedLocations = bookedRes.data.bookedLocations;
+        if (Array.isArray(event.booths)) {
+          for (const booth of event.booths) {
+            const boothId =
+              typeof booth === "object" && booth !== null ? booth._id : booth;
 
-          let availableLocations = 0;
+            try {
+              const locRes = await axios.get(
+                `${baseUrl}/api/location/booth/${boothId}`,
+                {
+                  params: { eventId: event._id },
+                }
+              );
 
-          if (event.expoCenter && Array.isArray(event.expoCenter.booths) && Array.isArray(event.booth)) {
-            event.booth.forEach(boothId => {
-              const boothObj = event.expoCenter.booths.find(b => b.id === boothId);
-              if (boothObj && Array.isArray(boothObj.locations)) {
-                const availableLocs = boothObj.locations.filter(loc => {
-                  const isBooked = bookedLocations.some(
-                    (bl) => bl.boothId === boothId && bl.locationId === loc.id
-                  );
-                  return !isBooked;
-                });
-                availableLocations += availableLocs.length;
-              }
-            });
+              totalAvailable += locRes.data.data?.length || 0;
+            } catch (err) {
+              console.error("Error fetching locations for booth", boothId, err);
+            }
           }
+        }
 
-          return {
-            ...event,
-            availableLocations,
-          };
-        })
-      );
+        counts[event._id] = totalAvailable;
+      }
 
-      const filteredEvents = eventsWithAvailability.filter(e => e.availableLocations > 0);
-      setEvents(filteredEvents);
+      setLocationCounts(counts);
     } catch (err) {
       console.error("Failed to fetch events:", err);
       toast.error("Failed to fetch events");
     }
   };
 
-  const handleRegister = (eventId) => {
+  const handleViewRegistrations = (eventId) => {
     navigate(`/registerevent/${eventId}`);
   };
 
-  const filteredEvents = events.filter(event =>
-    event.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEvents = events.filter((event) => {
+    const from = filterFromDate ? new Date(filterFromDate) : null;
+    const to = filterToDate ? new Date(filterToDate) : null;
+    const eventDate = new Date(event.dateFrom);
+    if (from && eventDate < from) return false;
+    if (to && eventDate > to) return false;
+    return true;
+  });
 
   return (
-    <div className="max-w-full overflow-x-auto p-4">
-      <div className="mb-4">
-        <Input
-          type="text"
-          placeholder="Search by event name..."
-          
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+    <div className="max-w-full overflow-x-auto">
+      {/* Filter Section */}
+      <div className="flex flex-wrap gap-4 mb-6 items-end">
+        <div>
+          <Label>From Date</Label>
+          <Input
+            type="date"
+            value={filterFromDate}
+            onChange={(e) => setFilterFromDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label>To Date</Label>
+          <Input
+            type="date"
+            value={filterToDate}
+            onChange={(e) => setFilterToDate(e.target.value)}
+          />
+        </div>
+        <Button
+          onClick={() => {
+            setFilterFromDate("");
+            setFilterToDate("");
+          }}
+          variant="outline"
+        >
+          Clear Filters
+        </Button>
       </div>
 
       <Table>
@@ -95,13 +117,14 @@ export default function DisplayEvents() {
             {[
               "Title",
               "Theme",
+              "Description",
               "From Date",
               "To Date",
-              "Booth Count",
+              "Booths",
               "Available Locations",
               "Expo Center",
-              "Map",
-              "Images",
+              "Expo Image",
+              "Expo Map",
               "Action",
             ].map((text) => (
               <TableCell
@@ -118,69 +141,86 @@ export default function DisplayEvents() {
         <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
           {filteredEvents.map((event) => (
             <TableRow key={event._id}>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">{event.title}</TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">{event.theme}</TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
+              <TableCell className="px-5 py-4">{event.title}</TableCell>
+              <TableCell className="px-5 py-4">{event.theme}</TableCell>
+              <TableCell className="px-5 py-4">{event.description}</TableCell>
+              <TableCell className="px-5 py-4">
                 {new Date(event.dateFrom).toLocaleDateString()}
               </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
+              <TableCell className="px-5 py-4">
                 {new Date(event.dateTo).toLocaleDateString()}
               </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {Array.isArray(event.booth) ? event.booth.length : 0}
+              <TableCell className="px-5 py-4">
+                {Array.isArray(event.booths)
+                  ? event.booths
+                      .map((b) =>
+                        typeof b === "object" && b !== null ? b.name || b._id : b
+                      )
+                      .join(", ")
+                  : event.booths}
               </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {event.availableLocations || 0}
+              <TableCell className="px-5 py-4">
+                {locationCounts[event._id] ?? "Loading..."}
               </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
+              <TableCell className="px-5 py-4">
                 {event.expoCenter?.name || "N/A"}
               </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {event.expoCenter?.mapSvg ? (
-                  event.expoCenter.mapSvg.startsWith("<svg") ? (
-                    <div dangerouslySetInnerHTML={{ __html: event.expoCenter.mapSvg }} />
+              <TableCell className="px-4 py-3 text-start">
+                <div className="flex -space-x-2">
+                  {Array.isArray(event.expoCenter?.images) &&
+                  event.expoCenter.images.length > 0 ? (
+                    event.expoCenter.images.map((img, index) => (
+                      <div
+                        key={index}
+                        className="w-6 h-6 overflow-hidden border-2 border-white rounded-full"
+                      >
+                        <img
+                          src={`${baseUrl}${img}`}
+                          alt="Expo"
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => setPreviewImage(`${baseUrl}${img}`)}
+                        />
+                      </div>
+                    ))
                   ) : (
+                    <span className="text-xs text-gray-400">No images</span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="px-4 py-3 text-start">
+                {event.expoCenter?.mapSvg ? (
+                  <div
+                    className="w-6 h-6 overflow-hidden border-2 border-white rounded-full cursor-pointer"
+                    onClick={() =>
+                      setPreviewImage(`${baseUrl}${event.expoCenter.mapSvg}`)
+                    }
+                  >
                     <img
                       src={`${baseUrl}${event.expoCenter.mapSvg}`}
                       alt="Map"
-                      className="h-16 w-16 object-contain cursor-pointer"
-                      onClick={() => setPreviewImage(`${baseUrl}${event.expoCenter.mapSvg}`)}
+                      className="w-full h-full object-cover"
                     />
-                  )
-                ) : (
-                  "N/A"
-                )}
-              </TableCell>
-              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {Array.isArray(event.expoCenter?.images) && event.expoCenter.images.length > 0 ? (
-                  <div className="flex gap-2 overflow-x-auto">
-                    {event.expoCenter.images.map((img, index) => (
-                      <img
-                        key={index}
-                        src={`${baseUrl}${img}`}
-                        alt={`img-${index}`}
-                        className="h-16 w-16 object-contain cursor-pointer"
-                        onClick={() => setPreviewImage(`${baseUrl}${img}`)}
-                      />
-                    ))}
                   </div>
                 ) : (
-                  "N/A"
+                  <span className="text-xs text-gray-400">No map</span>
                 )}
               </TableCell>
               <TableCell className="px-5 py-4">
-                <button
-                  onClick={() => handleRegister(event._id)}
-                  className="px-2 py-1 text-xs text-white bg-green-500 rounded hover:bg-green-600"
-                >
-                  Register To Event
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleViewRegistrations(event._id)}
+                    className="px-2 py-1 text-xs text-white bg-green-500 rounded hover:bg-green-600"
+                  >
+                    Add Registrations
+                  </button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
 
+      {/* Image Preview Modal */}
       {previewImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 pt-15">
           <div className="relative bg-white p-4 rounded-lg shadow-lg max-w-3xl w-full">

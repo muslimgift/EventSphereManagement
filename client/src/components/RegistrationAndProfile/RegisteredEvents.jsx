@@ -21,10 +21,10 @@ export default function RegisteredEvents() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const navigate = useNavigate();
-
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/register-event")
+      .get(`${BASE_URL}/api/register-event`)
       .then((res) => {
         if (res.data.status) {
           setUsers(res.data.events);
@@ -38,7 +38,7 @@ export default function RegisteredEvents() {
 
   const handleDelete = async () => {
     try {
-      await axios.delete(`http://localhost:3000/api/register-event/${selectedUserId}`);
+      await axios.delete(`${BASE_URL}/api/register-event/${selectedUserId}`);
       toast.success("Deleted Successfully");
       setUsers(users.filter((user) => user._id !== selectedUserId));
     } catch (err) {
@@ -180,7 +180,7 @@ export default function RegisteredEvents() {
 
                 <TableCell>
                   <a
-                    href={`http://localhost:3000/${order.file}`}
+                    href={`${BASE_URL}/${order.file}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-3 text-blue-500 underline text-start text-theme-sm dark:text-blue-400"

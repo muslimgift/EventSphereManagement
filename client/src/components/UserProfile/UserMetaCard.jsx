@@ -19,6 +19,7 @@ const [company, setCompany] = useState(user.companyname || "");
 const [phone, setPhone] = useState(user.phonenumber || "");
 const { isOpen, openModal, closeModal } = useModal();
 const [logoFile, setLogoFile] = useState(null);
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 const initializeForm = () => {
   setFacebook(user.facebooklink || "");
   setWebsite(user.websitelink || "");
@@ -56,7 +57,7 @@ const handleSave = async (e) => {
 
   try {
     const res = await axios.post(
-      "http://localhost:3000/api/user/updateprofile",
+      `${BASE_URL}/api/user/updateprofile`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },

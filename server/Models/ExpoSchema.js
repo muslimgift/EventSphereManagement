@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { nanoid } = require("nanoid");
+const BoothSchema = require("./BoothModel");
 
 const ExpoCenterSchema = new mongoose.Schema({
   name: { type: String, required: [true, "Expo center name is required"] },
@@ -18,50 +18,7 @@ const ExpoCenterSchema = new mongoose.Schema({
     },
   },
   facilities: { type: String, default: "" },
-  mapSvg: { type: String, required: [true, "Map svg image is required"] },
-  booths: {
-    type: [
-      {
-        id: {
-          type: String,
-          default: () => nanoid(),
-        },
-        name: { type: String, required: [true, "Booth name is required"] },
-        locations: [
-          {
-            id: {
-              type: String,
-              default: () => nanoid(),
-            },
-            name: { type: String, required: [true, "Location Name is required"] },
-            price: { type: Number, required: [true, "Location price is required"] },
-            status: {
-              type: String,
-              enum: ["available", "booked"],
-              default: "available",
-            },
-          },
-        ],
-        status: {
-          type: String,
-          enum: ["available", "booked"],
-          default: "available",
-        },
-      },
-    ],
-    required: [true, "At least one booth is required"],
-    validate: {
-      validator: function (booths) {
-        const seen = new Set();
-        for (let b of booths) {
-          if (seen.has(b.id)) return false;
-          seen.add(b.id);
-        }
-        return true;
-      },
-      message: "Booth IDs must be unique within an Expo Center.",
-    },
-  },
+  mapSvg: { type: String, required: [true, "Map SVG image is required"] },
   createdAt: {
     type: Date,
     default: Date.now,

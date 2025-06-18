@@ -1,4 +1,5 @@
 const ChatMessage = require("../Models/ChatBox");
+const mongoose = require('mongoose');
 
 const ChatController = {
 // Send new message
@@ -19,6 +20,43 @@ sendMessage : async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 },
+getUnreadChatCountsBySender : async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Missing userId in query" });
+    }
+
+    const unreadMessages = await ChatMessage.aggregate([
+      {
+        $match: {
+          receiver: new mongoose.Types.ObjectId(userId),
+          seenBy: "Unseen",
+          deletedFor: { $ne: new mongoose.Types.ObjectId(userId) },
+        },
+      },
+      {
+        $group: {
+          _id: "$sender",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Convert to object: { senderId: count }
+    const unreadCounts = {};
+    unreadMessages.forEach(({ _id, count }) => {
+      unreadCounts[_id] = count;
+    });
+
+    res.status(200).json({ unreadCounts });
+  } catch (error) {
+    console.error("Error fetching grouped unread counts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+},
+
 // Fetch messages between two users or for a group
 getMessages: async (req, res) => {
   try {

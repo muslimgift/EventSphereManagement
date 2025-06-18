@@ -16,8 +16,9 @@ const initialState = {
   dateFrom: "",
   dateTo: "",
   expoCenter: "",
-  booth: [],
+  booths: [], // changed from 'booth'
 };
+
 
 export default function UpdateEvent() {
   const { id } = useParams();
@@ -25,19 +26,21 @@ export default function UpdateEvent() {
   const [formData, setFormData] = useState(initialState);
   const [expoCenters, setExpoCenters] = useState([]);
   const [availableBooths, setAvailableBooths] = useState([]);
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleBoothChange = (selectedBooths) => {
-    setFormData((prev) => ({ ...prev, booth: selectedBooths }));
-  };
+const handleBoothChange = (selectedBooths) => {
+  setFormData((prev) => ({ ...prev, booths: selectedBooths }));
+};
+
 
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/expo")
+      .get(`${BASE_URL}/api/expo`)
       .then((res) => {
         setExpoCenters(res.data.data);
       })
@@ -47,11 +50,12 @@ export default function UpdateEvent() {
   useEffect(() => {
     if (formData.expoCenter && formData.dateFrom && formData.dateTo) {
       axios
-        .get("http://localhost:3000/api/event/available-booths", {
+        .get(`${BASE_URL}/api/event/available-booths`, {
           params: {
             expoCenterId: formData.expoCenter,
             dateFrom: formData.dateFrom,
             dateTo: formData.dateTo,
+            excludeEventId: id,
           },
         })
         .then((res) => {
@@ -61,38 +65,53 @@ export default function UpdateEvent() {
     }
   }, [formData.expoCenter, formData.dateFrom, formData.dateTo]);
 
-  useEffect(() => {
-    axios
-      .get(`http://localhost:3000/api/event/${id}`)
-      .then((res) => {
-        const event = res.data.data;
-        setFormData({
-          title: event.title,
-          description: event.description,
-          theme: event.theme,
-          dateFrom: event.dateFrom.split("T")[0],
-          dateTo: event.dateTo.split("T")[0],
-          expoCenter: event.expoCenter._id || event.expoCenter,
-          booth: Array.isArray(event.booth) ? event.booth : [event.booth],
-        });
-      })
-      .catch(() => toast.error("Failed to fetch event details"));
-  }, [id]);
+useEffect(() => {
+  axios
+    .get(`${BASE_URL}/api/event/${id}`)
+    .then((res) => {
+      const event = res.data;
+      console.log(event)
+      setFormData({
+        title: event.title,
+        description: event.description,
+        theme: event.theme,
+        dateFrom: event.dateFrom.split("T")[0],
+        dateTo: event.dateTo.split("T")[0],
+        expoCenter: event.expoCenter._id || event.expoCenter,
+        booths: Array.isArray(event.booths) ? event.booths : [event.booths],
+      });
+    })
+    .catch(() => toast.error("Failed to fetch event details"));
+}, [id]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.put(`http://localhost:3000/api/event/${id}`, formData);
-      if (res.data.success) {
-        toast.success("Event updated successfully!");
-        navigate("/display-event");
-      } else {
-        toast.error(res.data.message);
-      }
-    } catch (error) {
-      toast.error("Failed to update event: " + error.message);
+
+const handleSubmit = async (e) => {
+  e.preventDefault();
+
+const selectedBoothIds = formData.booths.map((b) => (typeof b === 'string' ? b : b._id));
+  const validBoothIds = availableBooths.map((b) => b._id);
+
+  const hasValidBooth = selectedBoothIds.some((id) => validBoothIds.includes(id));
+
+  if (!hasValidBooth) {
+    toast.error("Please select at least one valid booth.");
+    return;
+  }
+  try {
+    const res = await axios.put(`${BASE_URL}/api/event/${id}`, formData);
+    if (res.data.success) {
+      toast.success("Event updated successfully!");
+      navigate("/display-event");
+    } else {
+      toast.error(res.data.message || "Failed to update event");
     }
-  };
+  } catch (error) {
+    const errorMsg = error.response?.data?.message || "An unexpected error occurred";
+    toast.error("Failed to update event: " + errorMsg);
+  }
+};
+
+
 
   return (
     <ComponentCard title="Update Event">
@@ -134,12 +153,13 @@ export default function UpdateEvent() {
           required
         />
         <MultiSelect
-          label="Select Booth(s)"
-          options={availableBooths.map((b) => ({ text: b.name, value: b.id }))}
-          selectedOptions={formData.booth}
-          onChange={handleBoothChange}
-          disabled={availableBooths.length === 0}
-        />
+  label="Select Booth(s)"
+  options={availableBooths.map((b) => ({ text: b.name, value: b._id }))}
+  selectedOptions={formData.booths}
+  onChange={handleBoothChange}
+  disabled={availableBooths.length === 0}
+/>
+
         <TextArea
           name="description"
           value={formData.description}

@@ -13,6 +13,8 @@ export default function SignInForm() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
+
 
   const {LoginUser} = useContext(userContext)
   const [loginData, setLoginData] = useState({
@@ -38,7 +40,7 @@ export default function SignInForm() {
   setSubmitted(true);
 
   try {
-    const response = await axios.post("http://localhost:3000/api/user/signin", loginData);
+    const response = await axios.post(`${BASE_URL}/api/user/signin`, loginData);
     const { message, user, status } = response.data;
 
     if (status) {

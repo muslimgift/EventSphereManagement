@@ -20,7 +20,7 @@ export default function EditDeleteEvent() {
   const [filterFromDate, setFilterFromDate] = useState("");
   const [filterToDate, setFilterToDate] = useState("");
   const navigate = useNavigate();
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     fetchEvents();
@@ -37,24 +37,20 @@ export default function EditDeleteEvent() {
   };
 
   const handleDelete = async () => {
-  try {
-    await axios.delete(`${baseUrl}/api/event/${selectedEventId}`);
-    toast.success("Deleted Successfully");
-    setEvents((prev) => prev.filter((event) => event._id !== selectedEventId));
-  } catch (err) {
-    console.error("Delete failed:", err);
-
-    // Check if backend sent a message in response.data.message or response.data.error
-    const backendMessage =
-      err.response?.data?.message || err.response?.data?.error || "Unknown error";
-
-    toast.error("Delete failed: " + backendMessage);
-  } finally {
-    setShowConfirm(false);
-    setSelectedEventId(null);
-  }
-};
-
+    try {
+      await axios.delete(`${baseUrl}/api/event/${selectedEventId}`);
+      toast.success("Deleted Successfully");
+      setEvents((prev) => prev.filter((event) => event._id !== selectedEventId));
+    } catch (err) {
+      console.error("Delete failed:", err);
+      const backendMessage =
+        err.response?.data?.message || err.response?.data?.error || "Unknown error";
+      toast.error("Delete failed: " + backendMessage);
+    } finally {
+      setShowConfirm(false);
+      setSelectedEventId(null);
+    }
+  };
 
   const handleUpdate = (eventId) => {
     navigate(`/update-event/${eventId}`);
@@ -80,7 +76,6 @@ export default function EditDeleteEvent() {
             type="date"
             value={filterFromDate}
             onChange={(e) => setFilterFromDate(e.target.value)}
-            
           />
         </div>
 
@@ -90,7 +85,6 @@ export default function EditDeleteEvent() {
             type="date"
             value={filterToDate}
             onChange={(e) => setFilterToDate(e.target.value)}
-            className="border border-gray-300 px-3 py-1 rounded"
           />
         </div>
 
@@ -115,6 +109,7 @@ export default function EditDeleteEvent() {
               "To Date",
               "Booth",
               "Expo Center",
+              "Interested Users",
               "Action",
             ].map((text) => (
               <TableCell
@@ -144,10 +139,19 @@ export default function EditDeleteEvent() {
                 {new Date(event.dateTo).toLocaleDateString()}
               </TableCell>
               <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {Array.isArray(event.booth) ? event.booth.join(", ") : event.booth}
+                {Array.isArray(event.booths)
+                  ? event.booths
+                      .map((b) =>
+                        typeof b === "object" && b !== null ? b.name || b._id : b
+                      )
+                      .join(", ")
+                  : event.booths}
               </TableCell>
               <TableCell className="px-5 py-4 text-sm dark:text-white/90">
                 {event.expoCenter?.name || "N/A"}
+              </TableCell>
+              <TableCell className="px-5 py-4 text-sm dark:text-white/90">
+                {event.interestedUser?.length || 0}
               </TableCell>
               <TableCell className="px-5 py-4">
                 <div className="flex gap-2">
@@ -173,7 +177,7 @@ export default function EditDeleteEvent() {
         </TableBody>
       </Table>
 
-      {/* Delete Modal */}
+      {/* Delete Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-xl p-6 w-[90%] max-w-sm text-center">

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { toast } from "react-toastify";
-import { backend } from "../../config/hosting"; // your base URL config
 import Input from "../form/input/InputField";
 import Button from "../ui/button/Button";
 import Label from "../form/Label";
@@ -9,12 +8,13 @@ import axios from "axios";
 export default function ForgetPasswordForm() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await axios.post(`${backend}/api/user/forgetpassword`, {
+      const res = await axios.post(`${BASE_URL}/api/user/forgetpassword`, {
         email,
       });
       toast.success(res.data.message);

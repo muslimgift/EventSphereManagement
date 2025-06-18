@@ -11,14 +11,6 @@ const eventRegistrationSchema = new mongoose.Schema({
     ref: 'Event',
     required: true,
   },
-  boothId: {
-    type: String,
-    required: true,
-  },
-  locationId: {
-    type: String,
-    required: true,
-  },
   StallName: {
     type: String,
     required: true,
@@ -31,6 +23,15 @@ const eventRegistrationSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  boothId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "BoothSchema",
+},
+locationId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "LocationSchema",
+},
+
   file: {
   type: String,
   required: [true, "A related file is required"],

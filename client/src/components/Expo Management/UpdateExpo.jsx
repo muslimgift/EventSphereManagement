@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import { useNavigate, useParams } from "react-router-dom"; // If you're using React Router
+import { useNavigate, useParams } from "react-router-dom";
 import ComponentCard from "../common/ComponentCard";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -9,32 +9,42 @@ import FileInput from "../form/input/FileInput";
 import Button from "../ui/button/Button";
 import { toast } from "react-toastify";
 
-const initialState = {
-  name: "",
-  city: "",
-  address: "",
-  country: "",
-  description: "",
-  facilities: "",
-  booths: [],
-};
-
 export default function UpdateExpo() {
   const navigate = useNavigate();
-  const { id } = useParams(); // assuming you're using URL like /expo/edit/:id
-  const [formData, setFormData] = useState(initialState);
-  const [imageFiles, setImageFiles] = useState([]);
+  const { id } = useParams();
+
+  // Expo Center state
+  const [formData, setFormData] = useState({
+    name: "",
+    city: "",
+    address: "",
+    country: "",
+    description: "",
+    facilities: "",
+    images: [], // existing image URLs (strings)
+    mapSvg: "", // existing svg URL (string)
+  });
+  const [imageFiles, setImageFiles] = useState([]); // new images files
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mapSvgFile, setMapSvgFile] = useState(null);
   const [mapSvgPreview, setMapSvgPreview] = useState("");
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
-  // Fetch data when page loads
+  // Booths state - array of booths with locations nested inside
+  // Structure: [{ _id, name, locations: [{ _id, name, price, Booth }] }]
+  const [booths, setBooths] = useState([]);
+
+  // Track deleted booth and location IDs for DELETE requests
+  const [deletedBoothIds, setDeletedBoothIds] = useState([]);
+  const [deletedLocationIds, setDeletedLocationIds] = useState([]);
+
+  // Fetch ExpoCenter, booths, locations on mount
   useEffect(() => {
-    const fetchExpo = async () => {
+    async function fetchData() {
       try {
-        const { data } = await axios.get(`http://localhost:3000/api/expo/${id}`);
-        const expo = data.data;
-
+        // Fetch expo center
+        const { data: expoRes } = await axios.get(`${BASE_URL}/api/expo/${id}`);
+        const expo = expoRes.data;
         setFormData({
           name: expo.name,
           city: expo.location.city,
@@ -42,170 +52,348 @@ export default function UpdateExpo() {
           country: expo.location.country,
           description: expo.description,
           facilities: expo.facilities,
-          booths: expo.booths,
+          images: expo.images || [],
+          mapSvg: expo.mapSvg || "",
         });
+        setImagePreviews((expo.images || []).map((img) => `${BASE_URL}${img}`));
+        setMapSvgPreview(expo.mapSvg ? `${BASE_URL}${expo.mapSvg}` : "");
+        // Fetch booths linked to this expo center
+        const { data: boothsRes } = await axios.get(`${BASE_URL}/api/booth/expo/${id}`);
+        const boothsData = boothsRes || [];
 
-        setImagePreviews(expo.images.map((url) => `http://localhost:3000${url}`));
-        setMapSvgPreview(`http://localhost:3000${expo.mapSvg}`);
+        // For each booth, fetch locations
+        const boothsWithLocations = await Promise.all(
+          boothsData.map(async (booth) => {
+            const { data: locRes } = await axios.get(`${BASE_URL}/api/location/allbooth/${booth._id}`);
+            return {
+              ...booth,
+              locations: locRes.data || [],
+            };
+          })
+        );
+
+        setBooths(boothsWithLocations);
       } catch (error) {
-        console.error("Failed to fetch expo center:", error);
-        toast.error("Failed to load expo center");
+        console.error(error);
+        toast.error("Failed to load Expo Center data");
       }
-    };
-
-    fetchExpo();
+    }
+    fetchData();
   }, [id]);
 
+  // Handle ExpoCenter field changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle booths changes
   const handleBoothChange = (index, key, value) => {
-    const booths = [...formData.booths];
-    booths[index][key] = value;
-    setFormData((prev) => ({ ...prev, booths }));
+    const updatedBooths = [...booths];
+    updatedBooths[index][key] = value;
+    setBooths(updatedBooths);
   };
 
-  const handleLocationChange = (boothIndex, locationIndex, key, value) => {
-    const booths = [...formData.booths];
-    booths[boothIndex].locations[locationIndex][key] = value;
-    setFormData((prev) => ({ ...prev, booths }));
+  // Handle locations changes
+  const handleLocationChange = (boothIndex, locIndex, key, value) => {
+    const updatedBooths = [...booths];
+    updatedBooths[boothIndex].locations[locIndex][key] = value;
+    setBooths(updatedBooths);
   };
 
+  // Add a new booth (without _id initially)
+  const addBooth = () => {
+    setBooths((prev) => [...prev, { name: "", expoCenter: id, locations: [] }]);
+  };
+
+  // Remove a booth
+  const removeBooth = (index) => {
+    const boothToDelete = booths[index];
+    if (boothToDelete._id) {
+      setDeletedBoothIds((prev) => [...prev, boothToDelete._id]);
+      // Also mark its locations for deletion
+      boothToDelete.locations.forEach((loc) => {
+        if (loc._id) setDeletedLocationIds((prev) => [...prev, loc._id]);
+      });
+    }
+    setBooths((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Add location inside a booth
+  const addLocation = (boothIndex) => {
+    const updatedBooths = [...booths];
+    updatedBooths[boothIndex].locations.push({ name: "", price: "", Booth: updatedBooths[boothIndex]._id });
+    setBooths(updatedBooths);
+  };
+
+  // Remove location from booth
+  const removeLocation = (boothIndex, locIndex) => {
+    const locToDelete = booths[boothIndex].locations[locIndex];
+    if (locToDelete._id) {
+      setDeletedLocationIds((prev) => [...prev, locToDelete._id]);
+    }
+    const updatedBooths = [...booths];
+    updatedBooths[boothIndex].locations.splice(locIndex, 1);
+    setBooths(updatedBooths);
+  };
+
+  // Handle image uploads
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    const previews = files.map((file) => URL.createObjectURL(file));
     setImageFiles(files);
+    const previews = files.map((file) => URL.createObjectURL(file));
     setImagePreviews(previews);
   };
 
+  // Handle map SVG upload
   const handleMapSvgUpload = (e) => {
     const file = e.target.files[0];
-    if (file?.type !== "image/svg+xml") {
-      toast.error("Only SVG files are allowed for Map SVG");
+    if (file && file.type !== "image/svg+xml") {
+      toast.error("Only SVG files are allowed for map SVG");
       return;
     }
-
     setMapSvgFile(file);
     setMapSvgPreview(URL.createObjectURL(file));
   };
 
-  const addBooth = () => {
-    setFormData((prev) => ({
-      ...prev,
-      booths: [
-        ...prev.booths,
-        { id: "", name: "", locations: [{ id: "", name: "", price: "" }] },
-      ],
-    }));
-  };
-
-  const removeBooth = (index) => {
-    const booths = [...formData.booths];
-    booths.splice(index, 1);
-    setFormData((prev) => ({ ...prev, booths }));
-  };
-
-  const addLocation = (boothIndex) => {
-    const booths = [...formData.booths];
-    booths[boothIndex].locations.push({ id: "", name: "", price: "" });
-    setFormData((prev) => ({ ...prev, booths }));
-  };
-
-  const removeLocation = (boothIndex, locationIndex) => {
-    const booths = [...formData.booths];
-    booths[boothIndex].locations.splice(locationIndex, 1);
-    setFormData((prev) => ({ ...prev, booths }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    try {
-      const data = new FormData();
-
-      data.append("name", formData.name);
-
-      const locationObj = {
+  // Submit handler
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  try {
+    // --- 1. Update ExpoCenter itself ---
+    const expoForm = new FormData();
+    expoForm.append("name", formData.name);
+    expoForm.append(
+      "location",
+      JSON.stringify({
         city: formData.city,
         address: formData.address,
         country: formData.country,
-      };
-      data.append("location", JSON.stringify(locationObj));
-      data.append("description", formData.description);
-      data.append("facilities", formData.facilities);
-      data.append("booths", JSON.stringify(formData.booths));
+      })
+    );
+    expoForm.append("description", formData.description);
+    expoForm.append("facilities", formData.facilities);
+    imageFiles.forEach((f) => expoForm.append("images", f));
+    if (mapSvgFile) expoForm.append("mapSvg", mapSvgFile);
 
-      imageFiles.forEach((file) => data.append("images", file));
-      if (mapSvgFile) {
-        data.append("mapSvg", mapSvgFile);
+    await axios.put(`${BASE_URL}/api/expo/${id}`, expoForm, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    // --- 2. Delete removed Locations ---
+    await Promise.all(
+      deletedLocationIds.map((locId) =>
+        axios.delete(`${BASE_URL}/api/location/${locId}`)
+      )
+    );
+
+    // --- 3. Delete removed Booths ---
+    await Promise.all(
+      deletedBoothIds.map((boothId) =>
+        axios.delete(`${BASE_URL}/api/booth/${boothId}`)
+      )
+    );
+
+    // --- 4. Upsert remaining Booths & Locations ---
+    for (let booth of booths) {
+      let boothId = booth._id;
+      const boothPayload = { name: booth.name, expoCenter: id };
+
+      if (boothId) {
+        // UPDATE existing booth
+        await axios.put(`${BASE_URL}/api/booth/${boothId}`, boothPayload);
+      } else {
+        // CREATE new booth
+        const { data } = await axios.post(`${BASE_URL}/api/booth`, boothPayload);
+        boothId = data.data._id;
       }
 
-      await axios.put(`http://localhost:3000/api/expo/${id}`, data, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      // Now handle locations under this booth:
+      for (let loc of booth.locations || []) {
+        const locPayload = { name: loc.name, price: loc.price, Booth: boothId };
 
-      toast.success("Expo Center updated successfully");
-       navigate("/eddel-expo");
-    } catch (error) {
-      console.error("Error updating expo center:", error);
-      toast.error("Failed to update expo center");
+        if (loc._id) {
+          // UPDATE existing location
+          await axios.put(`${BASE_URL}/api/location/${loc._id}`, locPayload);
+        } else {
+          // CREATE new location
+          await axios.post(`${BASE_URL}/api/location`, locPayload);
+        }
+      }
     }
-  };
+
+    toast.success("Expo, booths & locations synchronized!");
+    navigate("/eddel-expo");
+  } catch (err) {
+    console.error(err);
+    toast.error(err.response?.data?.message || "Update failed");
+  }
+};
+
+
 
   return (
-    <ComponentCard title="Update Expo Center">
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Same form fields as AddExpo */}
-        <Input name="name" value={formData.name} onChange={handleInputChange} placeholder="Name" required />
-        <Input name="city" value={formData.city} onChange={handleInputChange} placeholder="City" required />
-        <Input name="address" value={formData.address} onChange={handleInputChange} placeholder="Address" required />
-        <Input name="country" value={formData.country} onChange={handleInputChange} placeholder="Country" required />
-        <TextArea name="description" value={formData.description} onChange={handleInputChange} placeholder="Description" required />
-        <Input name="facilities" value={formData.facilities} onChange={handleInputChange} placeholder="Facilities" required />
+    <div className="w-full max-w-7xl mx-auto">
+      <ComponentCard title="Update Expo Center">
+        <form onSubmit={handleSubmit} encType="multipart/form-data" className="space-y-6">
+          {/* Expo Center Basic Fields */}
+          <Label label="Expo Name" required />
+          <Input
+            type="text"
+            name="name"
+            placeholder="Expo Name"
+            value={formData.name}
+            onChange={handleInputChange}
+            required
+          />
 
-        <Label>Images</Label>
-        <FileInput type="file" multiple accept="image/*" onChange={handleImageUpload} />
-        <div className="flex gap-2 mt-2">
-          {imagePreviews.map((src, idx) => (
-            <img key={idx} src={src} alt="preview" className="w-24 h-24 object-cover border rounded" />
-          ))}
-        </div>
+          <Label label="City" />
+          <Input
+            type="text"
+            name="city"
+            placeholder="City"
+            value={formData.city}
+            onChange={handleInputChange}
+          />
 
-        <Label>Map SVG</Label>
-        <FileInput type="file" accept=".svg" onChange={handleMapSvgUpload} />
-        {mapSvgPreview && (
-          <img src={mapSvgPreview} alt="Map Preview" className="w-24 h-24 object-cover border rounded mt-2" />
-        )}
+          <Label label="Address" />
+          <Input
+            type="text"
+            name="address"
+            placeholder="Address"
+            value={formData.address}
+            onChange={handleInputChange}
+          />
 
-        {/* Booths and locations */}
-        {formData.booths.map((booth, i) => (
-          <div key={i} className="border p-4 rounded space-y-4 mb-4">
-            
-            <Input value={booth.name} onChange={(e) => handleBoothChange(i, "name", e.target.value)} placeholder="Booth Name" required />
+          <Label label="Country" />
+          <Input
+            type="text"
+            name="country"
+            placeholder="Country"
+            value={formData.country}
+            onChange={handleInputChange}
+          />
 
-            {booth.locations.map((loc, j) => (
-              <div key={j} className="border p-3 rounded space-y-2">
-                
-                <Input value={loc.name} onChange={(e) => handleLocationChange(i, j, "name", e.target.value)} placeholder="Location Name" required />
-                <Input value={loc.price} type="number" onChange={(e) => handleLocationChange(i, j, "price", e.target.value)} placeholder="Price" required />
-                {j > 0 && (
-                  <Button type="button" variant="destructive" size="sm" onClick={() => removeLocation(i, j)}>❌ Remove Location</Button>
-                )}
+          <Label label="Description" />
+          <TextArea
+            name="description"
+            placeholder="Description"
+            rows={3}
+            value={formData.description}
+            onChange={handleInputChange}
+          />
+
+          <Label label="Facilities" />
+          <TextArea
+            name="facilities"
+            placeholder="Facilities"
+            rows={3}
+            value={formData.facilities}
+            onChange={handleInputChange}
+          />
+
+          {/* Images */}
+          <Label label="Expo Images" />
+          <FileInput multiple accept="image/*" onChange={handleImageUpload} />
+          <div className="flex space-x-4 mt-2">
+            {imagePreviews.map((img, i) => (
+              <img
+                key={i}
+                src={img}
+                alt="Preview"
+                className="w-24 h-24 object-cover rounded border"
+              />
+            ))}
+          </div>
+
+          {/* Map SVG */}
+          <Label label="Expo Map (SVG)" />
+          <FileInput accept=".svg" onChange={handleMapSvgUpload} />
+          {mapSvgPreview && (
+            <img src={mapSvgPreview} alt="Map SVG Preview" className="w-48 h-auto mt-2" />
+          )}
+
+          {/* Booths & Locations */}
+          <div>
+            <h3 className="text-xl font-semibold mt-6 mb-2 dark:text-white">Booths & Locations</h3>
+            {booths.map((booth, boothIndex) => (
+              <div
+                key={booth._id || boothIndex}
+                className="border p-4 mb-4 rounded-md bg-gray-50 dark:bg-gray-900"
+              >
+                <div className="flex justify-between items-center mb-2">
+                  <Input
+                    type="text"
+                    value={booth.name}
+                    placeholder="Booth Name"
+                    onChange={(e) => handleBoothChange(boothIndex, "name", e.target.value)}
+                    required
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => removeBooth(boothIndex)}
+                    className="ml-2 bg-red-600 hover:bg-red-700"
+                  >
+                    Remove Booth
+                  </Button>
+                </div>
+
+                {/* Locations for this booth */}
+                <div className="ml-4">
+                  <h4 className="font-semibold mb-2 dark:text-white">Locations</h4>
+                  {booth.locations.map((loc, locIndex) => (
+                    <div
+                      key={loc._id || locIndex}
+                      className="flex space-x-2 items-center mb-2"
+                    >
+                      <Input
+                        type="text"
+                        value={loc.name}
+                        placeholder="Location Name"
+                        onChange={(e) =>
+                          handleLocationChange(boothIndex, locIndex, "name", e.target.value)
+                        }
+                        required
+                      />
+                      <Input
+                        type="number"
+                        value={loc.price}
+                        placeholder="Price"
+                        onChange={(e) =>
+                          handleLocationChange(boothIndex, locIndex, "price", e.target.value)
+                        }
+                        required
+                        min={0}
+                      />
+                      <Button
+                        type="button"
+                        onClick={() => removeLocation(boothIndex, locIndex)}
+                        className="bg-red-500 hover:bg-red-600"
+                      >
+                        Remove Location
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    onClick={() => addLocation(boothIndex)}
+                    className="mt-1 bg-green-600 hover:bg-green-700"
+                  >
+                    Add Location
+                  </Button>
+                </div>
               </div>
             ))}
-            <Button type="button" onClick={() => addLocation(i)} variant="outline" size="sm">+ Add Location</Button>
-            {i > 0 && (
-              <Button type="button" variant="destructive" size="sm" onClick={() => removeBooth(i)}>❌ Remove Booth</Button>
-            )}
+            <Button type="button" onClick={addBooth} className="bg-blue-600 hover:bg-blue-700">
+              Add Booth
+            </Button>
           </div>
-        ))}
 
-        <Button type="button" onClick={addBooth} variant="outline">+ Add Booth</Button>
-        <br />
-        <Button type="submit" className="bg-blue-600 text-white p-2 px-4 rounded">Update</Button>
-      </form>
-    </ComponentCard>
+          <Button type="submit" className="w-full bg-primary">
+            Update Expo Center
+          </Button>
+        </form>
+      </ComponentCard>
+    </div>
   );
 }

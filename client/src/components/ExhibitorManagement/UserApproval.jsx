@@ -15,10 +15,11 @@ export default function UserApproval() {
   const [selectedStatus, setSelectedStatus] = useState("all"); // Filter by status
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
   axios
-    .get("http://localhost:3000/api/user")
+    .get(`${BASE_URL}/api/user`)
     .then((res) => {
       if (res.data.status) {
         const exhibitors = res.data.users.filter((user) => user.role === "exhibitors");
@@ -33,7 +34,7 @@ export default function UserApproval() {
 
 const handleDelete = async () => {
   try {
-    await axios.delete(`http://localhost:3000/api/user/${selectedUserId}`);
+    await axios.delete(`${BASE_URL}/api/user/${selectedUserId}`);
     toast.success("Deleted Successfully");
     setUsers(users.filter((user) => user._id !== selectedUserId));
   } catch (err) {
@@ -47,7 +48,7 @@ const handleDelete = async () => {
 
 const handleStatusChange = async (userId, newStatus) => {
   try {
-    await axios.patch(`http://localhost:3000/api/user/${userId}`, {
+    await axios.patch(`${BASE_URL}/api/user/${userId}`, {
       CurrentStatus: newStatus,
     });
     setUsers(users.map((user) =>

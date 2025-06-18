@@ -25,11 +25,11 @@ const [formData, setFormData] = useState({
   const [availableDates, setAvailableDates] = useState([]);
   const [availableBooths, setAvailableBooths] = useState([]);
   const navigate = useNavigate();
-
+const BASE_URL = import.meta.env.VITE_BACKEND_URL;
   // Fetch all events
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/event")
+      .get(`${BASE_URL}/api/event`)
       .then((res) => setEvents(res.data.data))
       .catch(() => toast.error("Failed to load events"));
   }, []);
@@ -38,7 +38,7 @@ const [formData, setFormData] = useState({
   useEffect(() => {
   if (formData.event) {
     axios
-      .get(`http://localhost:3000/api/schedule/available/dates/${formData.event}`)
+      .get(`${BASE_URL}/api/schedule/available/dates/${formData.event}`)
       .then((res) => {
         
         setAvailableDates(res.data || []);
@@ -53,7 +53,7 @@ const [formData, setFormData] = useState({
   const { event, scheduledate, StartTime, EndTime } = formData;
   if (event && scheduledate && StartTime && EndTime) {
    axios
-      .get("http://localhost:3000/api/schedule/available/booths", {
+      .get(`${BASE_URL}/api/schedule/available/booths`, {
         params: { eventId: event, scheduledate, StartTime, EndTime },
       })
       .then((res) => {
@@ -77,7 +77,10 @@ const handleChange = (e) => {
     e.preventDefault();
 
     try {
-      const res = await axios.post("http://localhost:3000/api/schedule", formData);
+      const res = await axios.post(`${BASE_URL}/api/schedule`, {
+  ...formData,
+  booth: [formData.booth], // ensure booth is an array
+});
       if (res.data.success) {
         toast.success("Schedule created!");
         navigate("/display-schedule");
@@ -153,7 +156,7 @@ const handleChange = (e) => {
   value={formData.booth}
   onChange={handleChange}
   options={availableBooths.map((b) => ({
-    value: b.id,    // use booth id as value
+    value: b._id,    // use booth id as value
     label: b.name,  // show booth name in dropdown
   }))}
   placeholder="Select Booth"

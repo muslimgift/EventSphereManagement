@@ -6,7 +6,7 @@ import TextArea from "../form/input/TextArea";
 import Button from "../ui/button/Button";
 import { toast } from "react-toastify";
 import Select from "../form/Select";
-import MultiSelect from "../form/MultiSelect"; // ✅ import custom MultiSelect
+import MultiSelect from "../form/MultiSelect";
 import { useNavigate } from "react-router-dom";
 import Label from "../form/Label";
 
@@ -15,9 +15,9 @@ const initialState = {
   description: "",
   theme: "",
   dateFrom: "",
-  dateTo:"",
+  dateTo: "",
   expoCenter: "",
-  booth: [], // ✅ multi-select is an array
+  booths: [],
 };
 
 export default function AddEvent() {
@@ -25,84 +25,79 @@ export default function AddEvent() {
   const navigate = useNavigate();
   const [expoCenters, setExpoCenters] = useState([]);
   const [availableBooths, setAvailableBooths] = useState([]);
+ const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     axios
-      .get("http://localhost:3000/api/expo")
-      .then((res) => {
-        setExpoCenters(res.data.data);
-      })
+      .get(`${BASE_URL}/api/expo`)
+      .then((res) => setExpoCenters(res.data.data))
       .catch(() => toast.error("Failed to load expo centers"));
   }, []);
 
   useEffect(() => {
-    if (formData.expoCenter && formData.dateFrom && formData.dateTo) {
+    const { expoCenter, dateFrom, dateTo } = formData;
+    if (expoCenter && dateFrom && dateTo) {
       axios
-        .get("http://localhost:3000/api/event/available-booths", {
-          params: { expoCenterId: formData.expoCenter, dateFrom: formData.dateFrom,dateTo:formData.dateTo },
+        .get(`${BASE_URL}/api/event/available-booths`, {
+          params: { expoCenterId: expoCenter, dateFrom, dateTo },
         })
-        .then((res) => {
-          setAvailableBooths(res.data.booths);
-        })
+        .then((res) => setAvailableBooths(res.data.booths))
         .catch((err) => {
-          console.error("Booth fetch error:", err);
+          console.error("Error fetching booths:", err);
           toast.error("Failed to fetch available booths");
         });
     } else {
-      setAvailableBooths([]); // clear booths if no expoCenter or date
-      setFormData((prev) => ({ ...prev, booth: [] })); // reset booths selection
+      setAvailableBooths([]);
+      setFormData((prev) => ({ ...prev, booths: [] }));
     }
-  }, [formData.expoCenter, formData.dateFrom,formData.dateTo]);
+  }, [formData.expoCenter, formData.dateFrom, formData.dateTo]);
 
-  // Handle simple inputs + multi-select separately
   const handleChange = (eOrValue) => {
-    // If eOrValue is an event (from Input, Select, TextArea)
-    if (eOrValue && eOrValue.target) {
+    if (eOrValue?.target) {
       const { name, value } = eOrValue.target;
       setFormData((prev) => ({ ...prev, [name]: value }));
     } else {
-      // For MultiSelect onChange: eOrValue is array of selected values
-      setFormData((prev) => ({ ...prev, booth: eOrValue }));
+      setFormData((prev) => ({ ...prev, booths: eOrValue }));
     }
   };
-const handleSubmit = async (e) => {
-  e.preventDefault();
 
-  const today = new Date().setHours(0, 0, 0, 0); // strip time part
-  const fromDate = new Date(formData.dateFrom).setHours(0, 0, 0, 0);
-  const toDate = new Date(formData.dateTo).setHours(0, 0, 0, 0);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!formData.booth.length) {
-    toast.error("Please select at least one booth");
-    return;
-  }
+    const today = new Date().setHours(0, 0, 0, 0);
+    const start = new Date(formData.dateFrom).setHours(0, 0, 0, 0);
+    const end = new Date(formData.dateTo).setHours(0, 0, 0, 0);
 
-  if (fromDate < today) {
-    toast.error("Start date cannot be in the past");
-    return;
-  }
+    if (!formData.booths.length) {
+      toast.error("Please select at least one booth");
+      return;
+    }
 
-  if (toDate < fromDate) {
-    toast.error("End date must be the same or after the start date");
-    return;
-  }
+    if (start < today) {
+      toast.error("Start date cannot be in the past");
+      return;
+    }
 
-  try {
-    const res = await axios.post("http://localhost:3000/api/event", formData);
-    if (res.data.success) {
+    if (end < start) {
+      toast.error("End date must be the same or after the start date");
+      return;
+    }
+
+    try {
+      const payload = {
+        ...formData,
+      };
+
+      await axios.post(`${BASE_URL}/api/event`, payload);
       toast.success("Event created successfully!");
       navigate("/display-event");
       setFormData(initialState);
       setAvailableBooths([]);
-    } else {
-      toast.error(res.data.message);
+    } catch (error) {
+      console.error("Error creating event:", error);
+      toast.error("Failed to create event");
     }
-  } catch (error) {
-    console.error("Create event error:", error);
-    toast.error("Failed to create event");
-  }
-};
-
+  };
 
   return (
     <ComponentCard title="Add New Event">
@@ -121,45 +116,43 @@ const handleSubmit = async (e) => {
           placeholder="Theme (e.g., Tech, Arts)"
           required
         />
-        <Label
-        >From Date</Label>
+        <Label>From Date</Label>
         <Input
-  name="dateFrom"
-  type="date"
-  value={formData.dateFrom}
-  onChange={handleChange}
-  min={new Date().toISOString().split("T")[0]} // disable past dates
-  required
-/>
-
-
-
-        <Label
-        >To Date</Label>
-       <Input
-  name="dateTo"
-  type="date"
-  value={formData.dateTo}
-  onChange={handleChange}
-  min={formData.dateFrom || new Date().toISOString().split("T")[0]} // min is from date
-  required
-/>
+          name="dateFrom"
+          type="date"
+          value={formData.dateFrom}
+          onChange={handleChange}
+          min={new Date().toISOString().split("T")[0]}
+          required
+        />
+        <Label>To Date</Label>
+        <Input
+          name="dateTo"
+          type="date"
+          value={formData.dateTo}
+          onChange={handleChange}
+          min={formData.dateFrom || new Date().toISOString().split("T")[0]}
+          required
+        />
         <Select
           name="expoCenter"
           value={formData.expoCenter}
           onChange={handleChange}
-          options={expoCenters.map((e) => ({ label: e.name, value: e._id }))}
+          options={expoCenters.map((expo) => ({
+            label: expo.name,
+            value: expo._id,
+          }))}
           placeholder="Select Expo Center"
           required
         />
         <MultiSelect
-          name="booth"
+          name="booths"
           label="Select Available Booth(s)"
-          selectedOptions={formData.booth} // <-- Note prop is selectedOptions, NOT value
+          selectedOptions={formData.booths}
           onChange={handleChange}
-          options={availableBooths.map((b) => ({
-            text: b.name,
-            value: b.id,
+          options={availableBooths.map((booth) => ({
+            text: booth.name,
+            value: booth._id,
           }))}
         />
         <TextArea

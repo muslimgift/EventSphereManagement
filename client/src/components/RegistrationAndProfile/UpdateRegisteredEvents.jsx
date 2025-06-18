@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import ComponentCard from '../common/ComponentCard';
 import axios from 'axios';
@@ -8,6 +8,7 @@ import Input from '../form/input/InputField';
 import FileInput from '../form/input/FileInput';
 import Button from '../ui/button/Button';
 import Select from '../form/Select';
+import { userContext } from '../../context/UserContext';
 
 const initialState = {
   boothId: '',
@@ -22,23 +23,20 @@ export default function UpdateRegisteredEvents() {
   const { id: registrationId } = useParams();
   const [formData, setFormData] = useState(initialState);
   const [availableBooths, setAvailableBooths] = useState([]);
-  const [bookedLocations, setBookedLocations] = useState([]);
-  
-  const baseUrl = 'http://localhost:3000';
+  const [availableLocations, setAvailableLocations] = useState([]);
+  const [eventId, setEventId] = useState('');
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
   const navigate = useNavigate();
-
+const {user}=useContext(userContext)
+  // Load initial registration data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch current registration
         const { data } = await axios.get(`${baseUrl}/api/register-event/${registrationId}`);
         const registration = data.registration;
 
-        
-
-        // Set base form data
         setFormData({
-          boothId: registration.boothId,
+          boothId: registration.boothId._id,
           locationId: registration.locationId,
           StallName: registration.StallName,
           StaffName: registration.StaffName,
@@ -46,57 +44,54 @@ export default function UpdateRegisteredEvents() {
           file: null,
         });
 
-        // Get event + allowed booths
-        const eventData = await axios.get(`${baseUrl}/api/event/${registration.event._id}`);
-        const { expoCenter, booth: boothIds } = eventData.data.data;
+        const eventRes = await axios.get(`${baseUrl}/api/event/${registration.event._id}`);
+        setEventId(registration.event._id);
 
-        // Get Expo Center details
-        const expoDetails = await axios.get(`${baseUrl}/api/expo/${expoCenter._id}`);
-        const allBooths = expoDetails.data.data.booths.filter((b) => boothIds.includes(b.id));
+        const allowedBoothIds = eventRes.data.booths;
 
-        const booths = allBooths.map((b) => ({
-          id: b.id,
-          name: b.name,
-          locations: b.locations,
-        }));
-
-        setAvailableBooths(booths);
-
-        // Get booked locations for this event
-        const bookedRes = await axios.get(`${baseUrl}/api/register-event/booked-locations/${registration.event._id}`);
-        setBookedLocations(bookedRes.data.bookedLocations || []);
+        const boothRes = await axios.get(`${baseUrl}/api/booth`);
+        const allowedBooths = boothRes.data.data.filter((b) => allowedBoothIds.includes(b._id));
+        setAvailableBooths(allowedBooths);
       } catch (error) {
-        toast.error('Failed to fetch registration: ' + error.message);
+        toast.error('Failed to load registration data: ' + error.message);
       }
     };
 
     fetchData();
   }, [registrationId]);
 
-  // Filter locations for selected booth
-  const booth = availableBooths.find((b) => b.id === formData.boothId);
-  const availableLocations =
-    booth?.locations
-      .filter((loc) => {
-        const isBooked = bookedLocations.some(
-          (bl) =>
-            bl.boothId === booth.id &&
-            bl.locationId === loc.id &&
-            loc.id !== formData.locationId // allow user’s own location
-        );
-        return !isBooked;
-      })
-      .map((loc) => ({
-        value: loc.id,
-        label: `${booth.name} - ${loc.name} ($${loc.price})`,
-      })) || [];
+  // Fetch locations when booth changes
+  useEffect(() => {
+    const fetchLocationsByBooth = async () => {
+      if (!formData.boothId || !eventId) return;
+
+      try {
+        const res = await axios.get(
+  `${baseUrl}/api/location/booth/${formData.boothId}`,
+  {
+    params: {
+      eventId,
+      registrationId,
+    },
+  }
+);
+
+
+        setAvailableLocations(res.data.data);
+      } catch (err) {
+        toast.error('Failed to fetch locations: ' + err.message);
+      }
+    };
+
+    fetchLocationsByBooth();
+  }, [formData.boothId, eventId, formData.locationId]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === 'boothId' ? { locationId: '' } : {}),
+      ...(name === 'boothId' ? { locationId: '' } : {}), // reset location on booth change
     }));
   };
 
@@ -119,7 +114,12 @@ export default function UpdateRegisteredEvents() {
 
       await axios.put(`${baseUrl}/api/register-event/${registrationId}`, submitData);
       toast.success('Registration updated successfully');
-      navigate('/eventdisplay');
+      if(user.role=="exhibitors"){
+      navigate('/registeredevents');
+      }
+      else{
+        navigate('/user-application');
+      }
     } catch (err) {
       toast.error('Update failed: ' + err.message);
     }
@@ -132,7 +132,7 @@ export default function UpdateRegisteredEvents() {
           <Label htmlFor="boothId">Select Booth</Label>
           <Select
             name="boothId"
-            options={availableBooths.map((b) => ({ value: b.id, label: b.name }))}
+            options={availableBooths.map((b) => ({ value: b._id, label: b.name }))}
             value={formData.boothId}
             onChange={handleChange}
             required
@@ -143,7 +143,10 @@ export default function UpdateRegisteredEvents() {
           <Label htmlFor="locationId">Select Location</Label>
           <Select
             name="locationId"
-            options={availableLocations}
+            options={availableLocations.map((loc) => ({
+              value: loc._id,
+              label: `${loc.name} ($${loc.price})`,
+            }))}
             value={formData.locationId}
             onChange={handleChange}
             disabled={!formData.boothId}

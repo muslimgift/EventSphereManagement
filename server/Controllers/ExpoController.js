@@ -2,8 +2,10 @@ const path = require("path");
 const fs = require("fs");
 const expoModel = require("../Models/ExpoSchema");
 const eventModel = require("../Models/EventSchema");
+const boothModel = require("../Models/BoothModel");
+const locationModel = require("../Models/LocationModel");
 
-let expoController = {
+const expoController = {
   // Get all expo centers
   getExpoCenters: async (req, res) => {
     try {
@@ -34,29 +36,15 @@ let expoController = {
   // Create new Expo Center
   createExpoCenter: async (req, res) => {
     try {
-      const { name, location, description, facilities, booths } = req.body;
+      const { name, location, description, facilities } = req.body;
 
       const parsedLocation = location ? JSON.parse(location) : null;
-      const parsedBooths = booths ? JSON.parse(booths).map((booth) => ({
-        name: booth.name,
-        status: booth.status || "available",
-        locations: booth.locations?.map((loc) => ({
-          name: loc.name,
-          price: loc.price,
-          status: loc.status || "available",
-        })) || [],
-      })) : [];
-
-      if (!parsedLocation || !parsedBooths.length || !description || !name) {
-        return res.status(400).json({ success: false, error: "Missing required fields." });
-      }
-
       const images = req.files["images"]?.map((file) => `/uploads/${file.filename}`) || [];
       const mapSvgFile = req.files["mapSvg"] ? req.files["mapSvg"][0] : null;
       const mapSvg = mapSvgFile ? `/uploads/${mapSvgFile.filename}` : null;
 
-      if (!mapSvg || !images.length) {
-        return res.status(400).json({ success: false, error: "Images and Map SVG are required" });
+      if (!name || !parsedLocation || !description || !mapSvg || !images.length) {
+        return res.status(400).json({ success: false, error: "Missing required fields." });
       }
 
       const newExpoCenter = new expoModel({
@@ -66,7 +54,6 @@ let expoController = {
         images,
         facilities,
         mapSvg,
-        booths: parsedBooths,
       });
 
       await newExpoCenter.save();
@@ -78,113 +65,137 @@ let expoController = {
   },
 
   // Update Expo Center
-  updateExpoCenter: async (req, res) => {
-    try {
-      const expoId = req.params.id;
-      const existingExpo = await expoModel.findById(expoId);
 
-      if (!existingExpo) {
-        return res.status(404).json({ message: "Expo Center not found" });
-      }
 
-      // Delete previous images if new ones are uploaded
-      if (req.files.images) {
-        existingExpo.images.forEach((imgPath) => {
-          const fullPath = path.join(__dirname, "..", "..", "uploads", path.basename(imgPath));
-          if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath);
-        });
-      }
+updateExpoCenter : async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, location, description, facilities } = req.body;
 
-      // Delete previous mapSvg if new one uploaded
-      if (req.files.mapSvg) {
-        const fullMapPath = path.join(__dirname, "..", "..", "uploads", path.basename(existingExpo.mapSvg));
-        if (fs.existsSync(fullMapPath)) fs.unlinkSync(fullMapPath);
-      }
+    // 1️⃣ Load existing expo
+    const expo = await expoModel.findById(id);
+    if (!expo) return res.status(404).json({ message: "Expo not found" });
 
-      const { name, location, description, facilities, booths } = req.body;
+    // 2️⃣ Find all booths for this expo
+    const existingBooths = await boothModel.find({ expoCenter: id });
 
-      const parsedLocation = location ? JSON.parse(location) : {};
-      const parsedBooths = booths ? JSON.parse(booths).map((booth) => ({
-        name: booth.name,
-        status: booth.status || "available",
-        locations: booth.locations?.map((loc) => ({
+    // 3️⃣ If any booth has bookedEvents, block everything
+    if (existingBooths.some((b) => b.bookedEvents.length > 0)) {
+      return res.status(400).json({
+        message: "Cannot update booths/locations: some booths have booked events",
+      });
+    }
+
+    // 4️⃣ Delete old files if replaced
+    if (req.files?.images) {
+      expo.images.forEach((img) => {
+        const p = path.join(__dirname, "..", "..", "uploads", path.basename(img));
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      });
+    }
+    if (req.files?.mapSvg) {
+      const p = path.join(__dirname, "..", "..", "uploads", path.basename(expo.mapSvg));
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    }
+    // 6️⃣ Update expo core fields + files
+    const updated = {
+      name,
+      location: JSON.parse(location),
+      description,
+      facilities,
+    };
+    if (req.files?.images) {
+      updated.images = req.files.images.map((f) => `/uploads/${f.filename}`);
+    }
+    if (req.files?.mapSvg) {
+      updated.mapSvg = `/uploads/${req.files.mapSvg[0].filename}`;
+    }
+    await expoModel.findByIdAndUpdate(id, updated);
+
+    // 7️⃣ Re-create booths & locations from payload
+    const booths = req.body.booths ? JSON.parse(req.body.booths) : [];
+    for (let b of booths) {
+      const newBooth = await boothModel.create({
+        name: b.name,
+        expoCenter: id,
+      });
+      if (Array.isArray(b.locations)) {
+        const locDocs = b.locations.map((loc) => ({
           name: loc.name,
           price: loc.price,
-          status: loc.status || "available",
-        })) || [],
-      })) : [];
-
-      const updatedData = {
-        name,
-        location: parsedLocation,
-        description,
-        facilities,
-        booths: parsedBooths,
-      };
-
-      if (req.files.images) {
-        updatedData.images = req.files.images.map((file) => `/uploads/${file.filename}`);
+          Booth: newBooth._id,
+        }));
+        await locationModel.insertMany(locDocs);
       }
-
-      if (req.files.mapSvg) {
-        updatedData.mapSvg = `/uploads/${req.files.mapSvg[0].filename}`;
-      }
-
-      const updatedExpo = await expoModel.findByIdAndUpdate(expoId, updatedData, { new: true });
-      res.status(200).json({ message: "Expo center updated", data: updatedExpo });
-    } catch (error) {
-      console.error("Update Error:", error);
-      res.status(500).json({ message: "Internal Server Error" });
     }
-  },
 
-  // Delete Expo Center (prevent deletion if linked Events exist)
-  deleteExpoCenter: async (req, res) => {
-    try {
-      const expoCenterId = req.params.id;
+    return res.json({ message: "ExpoCenter, booths & locations updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+},
 
-      const linkedEvents = await eventModel.findOne({ expoCenter: expoCenterId });
+deleteExpoCenter: async (req, res) => {
+  try {
+    const expoCenterId = req.params.id;
 
-      if (linkedEvents) {
-        return res.status(400).json({
-          success: false,
-          message: "Cannot delete Expo Center because events are linked to it.",
-        });
-      }
-
-      const expoCenter = await expoModel.findByIdAndDelete(expoCenterId);
-      if (!expoCenter) {
-        return res.status(404).json({ success: false, error: "Expo center not found" });
-      }
-
-      expoCenter.images.forEach((imgPath) => {
-        const fullPath = path.resolve(`.${imgPath}`);
-        if (fs.existsSync(fullPath)) {
-          try {
-            fs.unlinkSync(fullPath);
-          } catch (err) {
-            console.warn(`Failed to delete image file: ${fullPath}`, err);
-          }
-        }
+    // 1. Check if any event uses this expo center
+    const linkedEvents = await eventModel.findOne({ expoCenter: expoCenterId });
+    if (linkedEvents) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete Expo Center because events are linked to it.",
       });
+    }
 
-      if (expoCenter.mapSvg) {
-        const mapPath = path.resolve(`.${expoCenter.mapSvg}`);
-        if (fs.existsSync(mapPath)) {
-          try {
-            fs.unlinkSync(mapPath);
-          } catch (err) {
-            console.warn(`Failed to delete mapSvg file: ${mapPath}`, err);
-          }
+    // 2. Find all booths linked to this expo center
+    const booths = await boothModel.find({ expoCenter: expoCenterId });
+
+    // 3. Extract booth ids
+    const boothIds = booths.map((b) => b._id);
+
+    // 4. Delete all locations linked to those booths
+    await locationModel.deleteMany({ Booth: { $in: boothIds } });
+
+    // 5. Delete all booths linked to expo center
+    await boothModel.deleteMany({ expoCenter: expoCenterId });
+
+    // 6. Delete Expo Center document
+    const expoCenter = await expoModel.findByIdAndDelete(expoCenterId);
+    if (!expoCenter) {
+      return res.status(404).json({ success: false, error: "Expo center not found" });
+    }
+
+    // 7. Delete image files and mapSvg from filesystem
+    expoCenter.images.forEach((imgPath) => {
+      const fullPath = path.resolve(`.${imgPath}`);
+      if (fs.existsSync(fullPath)) {
+        try {
+          fs.unlinkSync(fullPath);
+        } catch (err) {
+          console.warn(`Failed to delete image file: ${fullPath}`, err);
         }
       }
+    });
 
-      return res.status(200).json({ success: true, message: "Expo center deleted" });
-    } catch (error) {
-      console.error("Delete ExpoCenter Error:", error);
-      return res.status(500).json({ success: false, error: error.message });
+    if (expoCenter.mapSvg) {
+      const mapPath = path.resolve(`.${expoCenter.mapSvg}`);
+      if (fs.existsSync(mapPath)) {
+        try {
+          fs.unlinkSync(mapPath);
+        } catch (err) {
+          console.warn(`Failed to delete mapSvg file: ${mapPath}`, err);
+        }
+      }
     }
-  },
+
+    return res.status(200).json({ success: true, message: "Expo center and associated booths and locations deleted" });
+  } catch (error) {
+    console.error("Delete ExpoCenter Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+},
 };
 
 module.exports = expoController;

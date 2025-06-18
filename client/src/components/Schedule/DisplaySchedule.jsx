@@ -16,15 +16,17 @@ import Button from "../ui/button/Button";
 export default function DisplaySchedule() {
   const [schedules, setSchedules] = useState([]);
   const [expoCenters, setExpoCenters] = useState([]);
+  const [booths, setBooths] = useState([]);
   const [filterDate, setFilterDate] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState(null);
   const navigate = useNavigate();
-  const baseUrl = "http://localhost:3000";
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     fetchSchedules();
     fetchExpoCenters();
+    fetchBooths();
   }, []);
 
   const fetchSchedules = async () => {
@@ -40,12 +42,40 @@ export default function DisplaySchedule() {
   const fetchExpoCenters = async () => {
     try {
       const res = await axios.get(`${baseUrl}/api/expo`);
-      setExpoCenters(res.data.data || res.data);
+      setExpoCenters(res.data.data);
     } catch (err) {
       console.error("Failed to fetch Expo Centers:", err);
       toast.error("Failed to fetch Expo Centers");
     }
   };
+const fetchBooths = async () => {
+  try {
+    const res = await axios.get(`${baseUrl}/api/booth`);
+    setBooths(res.data.data);
+   
+    
+  } catch (err) {
+    console.error("Failed to fetch Booths:", err);
+    toast.error("Failed to fetch Booths");
+  }
+};
+const getBoothNamesFromIds = (boothIds) => {
+  if (!Array.isArray(boothIds)) return "N/A";
+  const names = boothIds.map((id) => {
+
+    const booth = booths.find((b) => b._id === id._id);
+    const expo = booth && expoCenters.find((e) => e._id === booth.expoCenter._id);
+    return booth && expo
+      ? `${booth.name} (${expo.name})`
+      : booth
+      ? booth.name
+      : "N/A";
+  });
+
+  return names.join(", ");
+};
+
+
 
   const handleDelete = async () => {
     try {
@@ -67,19 +97,6 @@ export default function DisplaySchedule() {
     navigate(`/update-schedule/${scheduleId}`);
   };
 
-  const getBoothNamesFromIds = (boothIds) => {
-    const names = [];
-
-    expoCenters.forEach((expo) => {
-      expo.booths.forEach((booth) => {
-        if (boothIds.includes(booth.id)) {
-          names.push(booth.name);
-        }
-      });
-    });
-
-    return names.join(", ");
-  };
 
   const filteredSchedules = schedules.filter((s) => {
     if (!filterDate) return true;
@@ -103,9 +120,7 @@ export default function DisplaySchedule() {
         </div>
 
         <Button
-          onClick={() => {
-            setFilterDate("");
-          }}
+          onClick={() => setFilterDate("")}
           variant="outline"
         >
           Clear Filter
@@ -138,7 +153,9 @@ export default function DisplaySchedule() {
         </TableHeader>
 
         <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-          {filteredSchedules.map((s) => (
+          {filteredSchedules.map((s) => 
+          (
+            
             <TableRow key={s._id}>
               <TableCell className="px-5 py-4 text-sm dark:text-white/90">
                 {s.title}
@@ -159,9 +176,7 @@ export default function DisplaySchedule() {
                 {s.EndTime}
               </TableCell>
               <TableCell className="px-5 py-4 text-sm dark:text-white/90">
-                {Array.isArray(s.booth)
-                  ? getBoothNamesFromIds(s.booth)
-                  : getBoothNamesFromIds([s.booth])}
+               {s.booth ? getBoothNamesFromIds(Array.isArray(s.booth) ? s.booth : [s.booth]) : "N/A"}
               </TableCell>
               <TableCell className="px-5 py-4 text-sm dark:text-white/90">
                 {s.event?.title || "N/A"}

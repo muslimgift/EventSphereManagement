@@ -15,67 +15,79 @@ const initialState = {
   locationId: '',
   StallName: '',
   file: null,
-  StaffName:'',
-  Product:'',
+  StaffName: '',
+  Product: '',
 };
 
 export default function RegisterEvents() {
   const { id: eventId } = useParams();
-  const { user } = useContext(userContext); // user._id expected
+  const { user } = useContext(userContext);
   const [formData, setFormData] = useState(initialState);
   const [availableBooths, setAvailableBooths] = useState([]);
-  const baseUrl = "http://localhost:3000";
-const [bookedLocations, setBookedLocations] = useState([]);
-const navigate=useNavigate();
+  const [locationsMap, setLocationsMap] = useState({});
+  const [bookedLocations, setBookedLocations] = useState([]);
+  const navigate = useNavigate();
+  const baseUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const fetchBoothsAndLocations = async () => {
       try {
-        const { data } = await axios.get(`${baseUrl}/api/event/${eventId}`);
-        const { expoCenter, booth: boothIds } = data.data;
+        // Step 1: Get the event to find its expoCenter
+        const { data: eventRes } = await axios.get(`${baseUrl}/api/event/${eventId}`);
+        const expoCenterId = eventRes.expoCenter;
+        console.log(expoCenterId)
 
-        const expoDetails = await axios.get(`${baseUrl}/api/expo/${expoCenter._id}`);
-        const allBooths = expoDetails.data.data.booths.filter(b => boothIds.includes(b.id));
-
-        const booths = allBooths.map(b => ({
-          id: b.id,
-          name: b.name,
-          locations: b.locations,
-        }));
-
+        // Step 2: Get booths that belong to this expoCenter
+        const { data: boothRes } = await axios.get(`${baseUrl}/api/booth/expo/${expoCenterId._id}`);
+        const booths = boothRes;
         setAvailableBooths(booths);
-      // Fetch booked locations for this event
+
+        // Step 3: For each booth, fetch its locations
+        const locationsResult = {};
+        for (let booth of booths) {
+          const { data: locRes } = await axios.get(
+            `${baseUrl}/api/location/booth/${booth._id}`,
+            {
+              params: { eventId },
+            }
+          );
+          console.log(`Locations for booth ${booth.name}:`, locRes.data); // 👈 ADD THIS
+          locationsResult[booth._id] = locRes.data;
+        }
+        setLocationsMap(locationsResult);
+
+        // Step 4: Get already booked locations for this event
         const bookedRes = await axios.get(`${baseUrl}/api/register-event/booked-locations/${eventId}`);
         setBookedLocations(bookedRes.data.bookedLocations || []);
       } catch (error) {
-        toast.error("Failed to fetch booths: " + error.message);
+        toast.error("Failed to load data: " + error.message);
       }
     };
 
     fetchBoothsAndLocations();
   }, [eventId]);
 
-  const booth = availableBooths.find(b => b.id === formData.boothId);
-  const availableLocations = booth?.locations
-  .filter(loc => {
-    // Remove status check, only filter by booked locations
-    const isBooked = bookedLocations.some(
-      (bl) => bl.boothId === booth.id && bl.locationId === loc.id
-    );
-    return !isBooked;
-  })
-  .map(loc => ({
-    value: loc.id,
-    label: `${booth.name} - ${loc.name} ($${loc.price})`
-  })) || [];
+  const booth = availableBooths.find(b => b._id === formData.boothId);
+  const boothLocations = locationsMap[formData.boothId] || [];
 
+  const availableLocations = boothLocations
+    .filter(loc => {
+      const isBooked = bookedLocations.some(
+        bl => bl.boothId === formData.boothId && bl.locationId === loc._id
+      );
+      return !isBooked;
+    })
+    .map(loc => ({
+      value: loc._id,
+      label: `${booth?.name || ''} - ${loc.name} ($${loc.price})`
+    }));
 
   const handleChange = e => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value,
-      ...(name === 'boothId' ? { locationId: '' } : {}) // reset location when booth changes
+      ...(name === 'boothId' ? { locationId: '' } : {})
     }));
   };
 
@@ -94,16 +106,12 @@ const navigate=useNavigate();
       submitData.append("StallName", formData.StallName);
       submitData.append("StaffName", formData.StaffName);
       submitData.append("Product", formData.Product);
-      
       if (formData.file) submitData.append("file", formData.file);
-for (let [key, value] of submitData.entries()) {
-  console.log(key, value);
-}
 
       await axios.post(`${baseUrl}/api/register-event`, submitData);
       toast.success("Successfully registered for the event");
       setFormData(initialState);
-      navigate("/eventdisplay")
+      navigate("/registeredevents");
     } catch (err) {
       toast.error("Registration failed: " + err.message);
     }
@@ -116,7 +124,7 @@ for (let [key, value] of submitData.entries()) {
           <Label htmlFor="boothId">Select Booth</Label>
           <Select
             name="boothId"
-            options={availableBooths.map(b => ({ value: b.id, label: b.name }))}
+            options={availableBooths.map(b => ({ value: b._id, label: b.name }))}
             value={formData.boothId}
             onChange={handleChange}
             placeholder="Select Booth"
@@ -146,9 +154,9 @@ for (let [key, value] of submitData.entries()) {
             value={formData.StallName}
             onChange={handleChange}
             required
-            className="border p-2 rounded w-full"
           />
         </div>
+
         <div>
           <Label htmlFor="StaffName">Staff Name</Label>
           <Input
@@ -158,11 +166,10 @@ for (let [key, value] of submitData.entries()) {
             value={formData.StaffName}
             onChange={handleChange}
             required
-            className="border p-2 rounded w-full"
           />
         </div>
 
-<div>
+        <div>
           <Label htmlFor="Product">Products/Services</Label>
           <Input
             type="text"
@@ -171,15 +178,13 @@ for (let [key, value] of submitData.entries()) {
             value={formData.Product}
             onChange={handleChange}
             required
-            className="border p-2 rounded w-full"
           />
         </div>
-
 
         <div>
           <Label htmlFor="file">Upload Related File</Label>
           <FileInput
-          required
+            required
             type="file"
             id="file"
             name="file"
@@ -188,9 +193,7 @@ for (let [key, value] of submitData.entries()) {
           />
         </div>
 
-        <Button type="submit">
-          Register
-        </Button>
+        <Button type="submit">Register</Button>
       </form>
     </ComponentCard>
   );

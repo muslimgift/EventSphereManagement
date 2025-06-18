@@ -32,6 +32,7 @@ export default function AddExpo() {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [mapSvgFile, setMapSvgFile] = useState(null);
   const [mapSvgPreview, setMapSvgPreview] = useState("");
+  const BASE_URL = import.meta.env.VITE_BACKEND_URL;
 
 
  const handleInputChange = (e) => {
@@ -127,42 +128,59 @@ const handleSubmit = async (e) => {
     return;
   }
 
-  if (!Array.isArray(formData.booths)) {
-    toast.error("Booths must be an array");
-    return;
-  }
-
   try {
-    const data = new FormData();
-
-    data.append("name", formData.name);
-
+    // 1. Submit Expo data without booths
+    const expoData = new FormData();
+    expoData.append("name", formData.name);
     const locationObj = {
       city: formData.city,
       address: formData.address,
       country: formData.country,
     };
-    data.append("location", JSON.stringify(locationObj));
+    expoData.append("location", JSON.stringify(locationObj));
+    expoData.append("description", formData.description);
+    expoData.append("facilities", formData.facilities);
+    imageFiles.forEach((file) => expoData.append("images", file));
+    expoData.append("mapSvg", mapSvgFile);
 
-    data.append("description", formData.description);
-    data.append("facilities", formData.facilities);
-    data.append("booths", JSON.stringify(formData.booths));
+    const expoResponse = await axios.post(
+      `${BASE_URL}/api/expo/`,
+      expoData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    const expoId = expoResponse.data.data._id; // Adjust if your API returns id differently
 
-    imageFiles.forEach((file) => data.append("images", file));
-    data.append("mapSvg", mapSvgFile);
+    // 2. For each booth, submit it with expoId
+for (const booth of formData.booths) {
+  const boothData = {
+  name: booth.name,
+  expoCenter: expoId, // Use the correct field name expected by schema
+};
 
-    await axios.post("http://localhost:3000/api/expo/", data, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
 
-    toast.success("Successfully Submitted");
-navigate("/eddel-expo");
-    // Reload page to reset all states and inputs
-    
+  const boothResponse = await axios.post(
+    `${BASE_URL}/api/booth/`,
+    boothData
+  );
+  const boothId = boothResponse.data.data._id;
+console.log(boothId)
+  // 3. For each location in booth, submit with Booth field
+  for (const location of booth.locations) {
+    const locationData = {
+      name: location.name,
+      price: location.price,
+      Booth: boothId, // Fix: use 'Booth' instead of 'boothId'
+    };
 
+    await axios.post(`${BASE_URL}/api/location/`, locationData);
+  }
+}
+
+    toast.success("Expo, booths, and locations added successfully");
+    navigate("/eddel-expo");
   } catch (error) {
-    console.error("Error submitting expo center:", error);
-    toast.error("Error submitting expo center");
+    console.error("Error submitting expo data:", error);
+    toast.error("Error submitting expo data");
   }
 };
 

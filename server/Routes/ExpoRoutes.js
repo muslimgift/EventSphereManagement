@@ -3,7 +3,6 @@ const expoController = require('../Controllers/ExpoController');
 const upload = require('../middleware/uploadMiddlewear');
 const router = express.Router()
 
-// http://localhost:3000/api/expo
 router.post(
   "/",
   upload.fields([

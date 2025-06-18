@@ -32,16 +32,24 @@ const EventSchema = new mongoose.Schema({
     ref: "ExpoCenter",
     required: [true, "Associated expo center is required"],
   },
-booth: [{
-  type: String,
-  required: true,
-}]
-,
+  booths: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BoothSchema",
+      required: true,
+    },
+  ],
+  interestedUser:[
+    {
+type: mongoose.Schema.Types.ObjectId,
+      ref: "user",
+      required: true,
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-const EventModel = mongoose.model("Event", EventSchema);
-module.exports = EventModel;
+module.exports = mongoose.model("Event", EventSchema);
